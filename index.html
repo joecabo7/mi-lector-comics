@@ -16,88 +16,37 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <style>
-    body {font-family:Inter,Arial,sans-serif!important;text-align:left!important;padding:0!important;background:#0f1117!important;}
-    .glass-panel{background:rgba(24,27,35,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08)}
-    #app-shell{height:100dvh;width:100%;display:flex;flex-direction:column;overflow:hidden;background:#0f1117;color:#f3f4f6}
-    #library-sidebar{width:290px;min-width:260px;max-width:82vw;background:#181b23;border-right:1px solid #ffffff14;display:flex;flex-direction:column;overflow:hidden}
-    #biblioteca{max-width:none;margin:0;padding:12px;display:flex;flex-direction:column;min-height:0;flex:1}
-    #buscador-contenedor{max-width:none;margin:10px 0;}
-    #buscador{font-size:14px;padding:11px;background:#10131a;border-color:#343947;border-radius:8px}
-    #btn-buscar{padding:10px 12px;font-size:13px;border-radius:8px;margin:0;background:#4f46e5}
-    #lista-comics{max-width:none;margin:8px 0;overflow:auto;min-height:0}
-    #lista-comics li{background:#212530;border-color:#343947;padding:9px;border-radius:8px;margin:5px 0;gap:8px}
-    #lista-comics li:hover{background:#292f3b;border-color:#6366f1}
-    .btn-abrir-comic{border-radius:7px;padding:7px 10px;background:#4f46e5;border-color:#6366f1}
-    #estado{font-size:11px;margin:8px 0;color:#9ca3af;text-align:left}
-    .ayuda{font-size:12px;margin:8px 0;text-align:left}
-    #visor{position:relative;inset:auto;flex:1;min-width:0;height:auto;min-height:0;display:none;background:#090a0d}
-    .visor-barra{top:8px;left:8px;right:8px;justify-content:flex-end;gap:5px}
-    .visor-barra .btn{background:rgba(30,34,45,.88);border:1px solid #ffffff20;border-radius:8px;padding:8px 10px;font-size:13px}
-    .visor-barra select{background:rgba(30,34,45,.92);border-radius:8px}
-    #btn-cerrar-comic{background:rgba(220,53,69,.9)!important}
-    #paginas-contenedor.modo-una.ajuste-pantalla #comic-img{max-height:100%;}
-    #paginas-contenedor.modo-multiple-vertical{padding-top:58px}
-    #reader-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;color:#6b7280;padding:24px;pointer-events:none}
-    #reader-empty i{font-size:42px;margin-bottom:16px;color:#343947}
-    @media(max-width:700px){#library-sidebar{width:100%;max-width:none;min-width:0;height:38%;border-right:0;border-bottom:1px solid #ffffff14}#work-area{flex-direction:column}#visor{min-height:0;flex:1}#app-shell{height:100dvh}#lista-comics{max-height:110px}#library-sidebar header .subtitulo{display:none}#sensibilidad-control{display:none!important}}
-  </style>
-    * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 20px; }
-    h1 { font-size: clamp(1.45rem, 4vw, 2rem); }
-    .btn { background: rgba(0, 123, 255, .78); color: white; border: 1px solid rgba(255,255,255,.16); padding: 14px 22px; font-size: 16px; cursor: pointer; border-radius: 5px; margin: 8px 4px; display: inline-block; font-weight: bold; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
-    .btn:hover { background: rgba(0, 86, 179, .86); }
-    .btn-peligro { background: rgba(220, 53, 69, .78) !important; }
-    .btn-peligro:hover { background: rgba(189, 33, 48, .88) !important; }
-    .btn:disabled { opacity: .55; cursor: wait; }
-    #lista-comics { list-style: none; padding: 0; max-width: 700px; margin: 20px auto; text-align: left; }
-    #lista-comics li { background: #1e1e1e; padding: 12px; margin: 6px 0; cursor: pointer; border-radius: 5px; border: 1px solid #333; display: flex; gap: 12px; justify-content: space-between; align-items: center; overflow-wrap: anywhere; }
-    #lista-comics li:hover { background: #252525; border-color: #007bff; }
-    #biblioteca { max-width: 760px; margin: 0 auto; }
-    #buscador-contenedor { display: none; gap: 8px; max-width: 700px; margin: 16px auto; }
-    #resultado-busqueda { display: none; }
-    #lista-comics li { min-width: 0; }
-    #lista-comics li .nombre-comic { display: block; flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-    .btn-abrir-comic { flex: 0 0 auto; background: #087cff; color: #fff; border: 1px solid #3292ff; border-radius: 5px; padding: 8px 15px; font-size: 14px; font-weight: bold; cursor: pointer; }
-    .btn-abrir-comic:hover { background: #005fc7; }
-    #buscador { flex: 1; min-width: 0; padding: 13px 14px; border-radius: 5px; border: 1px solid #555; background: #202020; color: white; font-size: 16px; }
-    #btn-buscar { margin: 0; }
-    #visor { display: none; position: fixed; inset: 0; z-index: 1000; background: #000; width: 100%; height: 100%; height: 100dvh; margin: 0; padding: 0; overflow: hidden; }
-    .visor-barra { position: fixed; z-index: 1002; top: max(8px, env(safe-area-inset-top)); left: 8px; right: 8px; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; pointer-events: none; }
-    .visor-barra > * { pointer-events: auto; }
-    .visor-barra .btn { margin: 0; padding: 9px 11px; font-size: 14px; box-shadow: 0 2px 10px #0008; flex-shrink: 0; }
-    .visor-barra select { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
-    #comic-img { transform-origin: 0 0; touch-action: none; }
-    #paginas-contenedor.zoom-activo { overflow: hidden; }
-    .visor-barra select { max-width: 175px; min-width: 0; padding: 9px 7px; color: #fff; background: rgba(36,36,36,.82); border: 1px solid rgba(255,255,255,.25); border-radius: 5px; font-size: 14px; }
-    #sensibilidad-control { display:flex; align-items:center; gap:6px; padding:6px 9px; color:#fff; background:rgba(25,25,25,.72); border:1px solid rgba(255,255,255,.2); border-radius:6px; font-size:12px; backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
-    #sensibilidad-mouse { width:90px; accent-color:#168cff; }
-    #sensibilidad-valor { min-width:22px; text-align:right; }
-    #btn-cerrar-comic { background:rgba(220,53,69,.82) !important; }
-    #btn-cerrar-comic:hover { background:rgba(189,33,48,.94) !important; }
-    #paginas-contenedor { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y pinch-zoom; }
-    #paginas-contenedor.modo-una { display: flex; justify-content: center; align-items: flex-start; }
-    #paginas-contenedor.ajuste-pantalla { align-items: center; }
-    #paginas-contenedor.modo-multiple-vertical { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 58px 0 12px; }
-    #paginas-contenedor.modo-multiple-horizontal { display: flex; flex-direction: row; align-items: center; gap: 3px; padding: 58px 12px 12px; overflow-x: auto; overflow-y: hidden; }
-    #comic-img, .pagina-comic { display: block; flex: 0 0 auto; margin: 0 auto; box-shadow: none; object-fit: contain; max-width: none; }
-    #paginas-contenedor.modo-una.ajuste-pantalla #comic-img { width: 100%; height: 100%; object-fit: contain; }
-    #paginas-contenedor.modo-una.ajuste-ancho #comic-img { width: 100%; height: auto; object-fit: contain; }
-    #paginas-contenedor.modo-multiple-vertical .pagina-comic { width: 100%; height: auto; }
-    #paginas-contenedor.modo-multiple-horizontal .pagina-comic { height: calc(100% - 70px); width: auto; max-width: 95vw; object-fit: contain; }
-    .controles { margin-bottom: 15px; }
-    #estado { color: #00ff88; margin: 15px auto; max-width: 900px; font-family: monospace; font-size: 14px; overflow-wrap: anywhere; }
-    .ayuda { color: #bbb; font-size: 13px; max-width: 700px; margin: 12px auto; line-height: 1.5; }
-    @media (max-width: 480px) {
-      body { padding: 12px; }
-      .btn { padding: 12px 14px; font-size: 15px; }
-      #lista-comics li { padding: 11px; }
-      #buscador-contenedor { gap: 6px; }
-      #buscador { padding: 12px 10px; }
-      .visor-barra { left: 5px; right: 5px; gap: 4px; }
-      .visor-barra .btn { padding: 8px 9px; font-size: 12px; }
-      .visor-barra select { max-width: 120px; padding: 8px 5px; font-size: 12px; }
-      #sensibilidad-control { display:none; }
-    }
+    body { font-family: Inter, Arial, sans-serif !important; margin:0; padding:0; background:#0f1117; }
+    .glass-panel { background:rgba(24,27,35,.85); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,.08); }
+    #app-shell { height:100dvh; width:100%; display:flex; flex-direction:column; overflow:hidden; background:#0f1117; color:#f3f4f6; }
+    #library-sidebar { width:290px; min-width:260px; max-width:82vw; background:#181b23; border-right:1px solid #ffffff14; display:flex; flex-direction:column; overflow:hidden; }
+    #biblioteca { max-width:none; margin:0; padding:12px; display:flex; flex-direction:column; min-height:0; flex:1; }
+    #buscador-contenedor { max-width:none; margin:10px 0; display:none; }
+    #buscador { flex:1; min-width:0; font-size:14px; padding:11px; background:#10131a; color:#fff; border:1px solid #343947; border-radius:8px; }
+    #btn-buscar { padding:10px 12px; font-size:13px; border-radius:8px; margin:0; background:#4f46e5; color:#fff; }
+    #lista-comics { list-style:none; padding:0; max-width:none; margin:8px 0; overflow:auto; min-height:0; }
+    #lista-comics li { background:#212530; border:1px solid #343947; padding:9px; border-radius:8px; margin:5px 0; gap:8px; display:flex; justify-content:space-between; align-items:center; min-width:0; }
+    #lista-comics li:hover { background:#292f3b; border-color:#6366f1; }
+    #lista-comics li .nombre-comic { display:block; flex:1 1 auto; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    .btn-abrir-comic { flex:0 0 auto; border-radius:7px; padding:7px 10px; background:#4f46e5; color:#fff; border:1px solid #6366f1; cursor:pointer; }
+    #resultado-busqueda { display:none; }
+    #estado { font-size:11px; margin:8px 0; color:#9ca3af; text-align:left; overflow-wrap:anywhere; }
+    .ayuda { font-size:12px; margin:8px 0; text-align:left; }
+    #comicvault-reader { height:100dvh; width:100%; }
+    #app { height:100%; width:100%; }
+    ::-webkit-scrollbar { width:6px; height:6px; }
+    ::-webkit-scrollbar-track { background:rgba(15,17,23,.6); }
+    ::-webkit-scrollbar-thumb { background:rgba(255,255,255,.2); border-radius:3px; }
+    .smooth-transition { transition:all .25s cubic-bezier(.4,0,.2,1); }
+    .no-scrollbar::-webkit-scrollbar { display:none; }
+    .no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
+    body.theme-midnight { background-color:#0b0f19; }
+    body.theme-midnight .glass-panel { background:rgba(15,23,42,.85); }
+    body.theme-oled { background-color:#000; }
+    body.theme-oled .glass-panel { background:rgba(18,18,18,.9); border-color:rgba(255,255,255,.05); }
+    body.theme-sepia { background-color:#1a1612; }
+    body.theme-sepia .glass-panel { background:rgba(38,32,26,.88); }
+    @media(max-width:700px) { #library-sidebar { width:100%; max-width:none; min-width:0; height:38%; border-right:0; border-bottom:1px solid #ffffff14; } #work-area { flex-direction:column; } #lista-comics { max-height:110px; } #library-sidebar header .subtitulo { display:none; } }
   </style>
 </head>
 <body class="bg-darkbg text-gray-100 h-full overflow-hidden select-none">
@@ -107,7 +56,7 @@
       <button id="btn-sidebar-toggle" class="p-2 rounded-lg hover:bg-white/10 text-gray-300" title="Mostrar/ocultar biblioteca"><i class="fa-solid fa-bars text-lg"></i></button>
       <i class="fa-solid fa-book-open text-indigo-400 text-xl"></i>
       <span class="font-bold tracking-wide text-base sm:text-lg whitespace-nowrap">Comic<span class="text-indigo-400">Vault</span></span>
-      <span id="comic-title" class="text-xs text-gray-400 truncate hidden sm:block"></span>
+      <span id="drive-comic-title" class="text-xs text-gray-400 truncate hidden sm:block"></span>
     </div>
     <div class="flex items-center gap-1 sm:gap-2 shrink-0">
       <button class="btn" id="btn-conectar" type="button" style="margin:0;padding:8px 10px;font-size:12px;border-radius:8px"><i class="fa-brands fa-google"></i> <span class="hidden sm:inline">Conectar Drive</span><span class="sm:hidden">Conectar</span></button>
@@ -149,6 +98,206 @@
       <footer class="absolute bottom-0 left-0 right-0 h-10 flex items-center justify-center gap-4 bg-black/40 text-xs text-gray-400 pointer-events-none"><i class="fa-solid fa-book-open"></i><span>ComicVault Reader</span></footer>
     </main>
   </div>
+</div>
+<div id="comicvault-reader" class="h-full w-full" style="display:none">
+    <!-- APP CONTAINER -->
+    <div id="app" class="hidden h-full w-full flex-col relative">
+
+        <!-- TOP NAVIGATION BAR -->
+        <header id="top-bar" class="glass-panel z-30 h-14 px-4 flex items-center justify-between shrink-0 transition-transform duration-300">
+            <div class="flex items-center space-x-3">
+                <button id="btn-sidebar-toggle" class="p-2 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors" title="Toggle Sidebar (T)">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </button>
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-book-open text-brand-500 text-xl"></i>
+                    <span class="font-bold tracking-wide text-lg hidden sm:inline">Comic<span class="text-brand-500">Vault</span></span>
+                </div>
+                <div class="h-4 w-px bg-white/10 mx-1 hidden sm:block"></div>
+                <span id="drive-comic-title" class="text-xs sm:text-sm text-gray-400 font-medium truncate max-w-[150px] sm:max-w-xs md:max-w-md">No file loaded</span>
+            </div>
+
+            <!-- Header Controls -->
+            <div class="flex items-center space-x-1 sm:space-x-2">
+                <!-- Open File Button -->
+                <button id="btn-open-file" class="flex items-center space-x-2 bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg shadow-brand-600/30">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <span class="hidden sm:inline">Biblioteca</span>
+                </button>
+                <input type="file" id="file-input" accept=".cbz,.zip" class="hidden">
+
+                <button id="btn-reader-logout" class="flex items-center space-x-1 bg-red-600/80 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium" title="Cerrar sesión de Google"><i class="fa-solid fa-right-from-bracket"></i><span>Cerrar sesión</span></button>
+
+                <!-- Page Layout Toggle -->
+                <button id="btn-page-mode" class="p-2 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors" title="Single/Double Page Mode (D)">
+                    <i class="fa-solid fa-book-open-reader text-lg"></i>
+                </button>
+
+                <!-- Reading Direction Toggle -->
+                <button id="btn-reading-dir" class="p-2 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors" title="Reading Direction (RTL / LTR)">
+                    <i class="fa-solid fa-arrow-right-to-line text-lg"></i>
+                </button>
+
+                <!-- Fullscreen Toggle -->
+                <button id="btn-fullscreen" class="p-2 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors" title="Toggle Fullscreen (F)">
+                    <i class="fa-solid fa-expand text-lg"></i>
+                </button>
+
+                <!-- Settings Dropdown Button -->
+                <div class="relative">
+                    <button id="btn-settings" class="p-2 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors" title="Settings">
+                        <i class="fa-solid fa-gear text-lg"></i>
+                    </button>
+                    <!-- Settings Menu -->
+                    <div id="settings-menu" class="hidden absolute right-0 mt-2 w-56 glass-panel rounded-xl shadow-2xl p-3 z-50 text-xs">
+                        <div class="font-semibold text-gray-400 uppercase tracking-wider mb-2 text-[10px]">Theme Accent</div>
+                        <div class="grid grid-cols-3 gap-2 mb-3">
+                            <button class="theme-opt bg-gray-900 border border-brand-500 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="default">Default</button>
+                            <button class="theme-opt bg-slate-900 border border-slate-700 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="midnight">Midnight</button>
+                            <button class="theme-opt bg-black border border-gray-800 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="oled">OLED</button>
+                        </div>
+                        <div class="font-semibold text-gray-400 uppercase tracking-wider mb-2 text-[10px]">Fit Preference</div>
+                        <div class="flex rounded-lg bg-black/30 p-1 mb-3">
+                            <button class="fit-opt flex-1 py-1 text-center rounded text-gray-400 hover:text-white transition-colors" data-fit="height">Height</button>
+                            <button class="fit-opt flex-1 py-1 text-center rounded text-gray-400 hover:text-white transition-colors" data-fit="width">Width</button>
+                            <button class="fit-opt flex-1 py-1 text-center rounded text-gray-400 hover:text-white transition-colors" data-fit="original">Original</button>
+                        </div>
+                        <div class="border-t border-white/10 pt-2 flex items-center justify-between">
+                            <span class="text-gray-300">Smooth Transitions</span>
+                            <input type="checkbox" id="chk-transitions" checked class="accent-brand-500 rounded cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN READER WORKSPACE -->
+        <div class="flex-1 flex relative overflow-hidden">
+
+            <!-- SIDEBAR -->
+            <aside id="sidebar" class="absolute lg:relative z-20 h-full w-72 glass-panel -translate-x-full lg:translate-x-0 transition-transform duration-300 flex flex-col shrink-0">
+                <!-- Sidebar Tabs -->
+                <div class="flex border-b border-white/10 text-xs font-medium">
+                    <button id="tab-btn-thumbs" class="flex-1 py-3 border-b-2 border-brand-500 text-brand-400 text-center font-semibold">
+                        <i class="fa-solid fa-border-all mr-1"></i> Pages
+                    </button>
+                    <button id="tab-btn-bookmarks" class="flex-1 py-3 border-b-2 border-transparent text-gray-400 hover:text-gray-200 text-center">
+                        <i class="fa-solid fa-bookmark mr-1"></i> Bookmarks (<span id="bookmark-count">0</span>)
+                    </button>
+                </div>
+
+                <!-- Pages Thumbnails View -->
+                <div id="tab-content-thumbs" class="flex-1 overflow-y-auto p-3 grid grid-cols-2 gap-3 content-start">
+                    <div class="col-span-2 text-center text-xs text-gray-500 py-10">Load a .cbz comic file to view thumbnails.</div>
+                </div>
+
+                <!-- Bookmarks View -->
+                <div id="tab-content-bookmarks" class="hidden flex-1 overflow-y-auto p-3 space-y-2">
+                    <div class="text-center text-xs text-gray-500 py-10">No bookmarks saved for this issue.</div>
+                </div>
+
+                <!-- Comic Meta / Quick Actions -->
+                <div class="p-3 border-t border-white/10 bg-black/20 text-xs text-gray-400 flex items-center justify-between">
+                    <span id="sidebar-info-pages">0 / 0 pages</span>
+                    <button id="btn-add-bookmark" class="p-1.5 hover:bg-white/10 rounded text-yellow-500 transition-colors" title="Bookmark Current Page">
+                        <i class="fa-regular fa-bookmark text-sm"></i>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- MAIN VIEWPORT / CONTAINER -->
+            <main id="reader-viewport" class="flex-1 h-full relative overflow-hidden bg-black/40 flex flex-col items-center justify-center">
+
+                <!-- DROPZONE / EMPTY STATE -->
+                <div id="dropzone" class="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center cursor-pointer transition-all duration-300 bg-darkbg/90 backdrop-blur-md border-2 border-dashed border-white/10 hover:border-brand-500/50">
+                    <div class="w-20 h-20 mb-4 rounded-full bg-brand-500/10 flex items-center justify-center text-brand-500 text-3xl">
+                        <i class="fa-solid fa-file-arrow-up"></i>
+                    </div>
+                    <h2 class="text-xl font-bold mb-2 text-gray-100">Drop your Comic file here</h2>
+                    <p class="text-sm text-gray-400 mb-6 max-w-sm">Supports standard <span class="text-brand-400 font-semibold">.CBZ</span> and <span class="text-brand-400 font-semibold">.ZIP</span> comic archives.</p>
+                    <button class="bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-600/30 flex items-center space-x-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Select File</span>
+                    </button>
+                </div>
+
+                <!-- CANVAS / DISPLAY CONTAINER -->
+                <div id="canvas-wrapper" class="w-full h-full flex items-center justify-center relative overflow-hidden cursor-grab active:cursor-grabbing">
+                    <!-- Images will be rendered here dynamically -->
+                    <div id="pages-container" class="flex items-center justify-center transition-transform duration-100 origin-center space-x-1">
+                        <!-- Single or Double Image Nodes -->
+                    </div>
+                </div>
+
+                <!-- OVERLAY NAV BUTTONS (LEFT / RIGHT) -->
+                <button id="btn-prev-overlay" class="absolute left-2 top-1/2 -translate-y-1/2 w-12 h-24 rounded-2xl bg-black/30 hover:bg-black/60 text-white/50 hover:text-white flex items-center justify-center transition-all opacity-0 hover:opacity-100 z-10">
+                    <i class="fa-solid fa-chevron-left text-2xl"></i>
+                </button>
+                <button id="btn-next-overlay" class="absolute right-2 top-1/2 -translate-y-1/2 w-12 h-24 rounded-2xl bg-black/30 hover:bg-black/60 text-white/50 hover:text-white flex items-center justify-center transition-all opacity-0 hover:opacity-100 z-10">
+                    <i class="fa-solid fa-chevron-right text-2xl"></i>
+                </button>
+
+                <!-- ZOOM CONTROLS (Floating) -->
+                <div class="absolute bottom-20 right-6 glass-panel rounded-xl p-1.5 flex flex-col space-y-1 z-20 shadow-xl border border-white/10 opacity-80 hover:opacity-100 transition-opacity">
+                    <button id="btn-zoom-in" class="p-2 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white transition-colors" title="Zoom In (+)">
+                        <i class="fa-solid fa-magnifying-glass-plus"></i>
+                    </button>
+                    <button id="btn-zoom-reset" class="p-2 hover:bg-white/10 rounded-lg text-xs font-bold text-gray-300 hover:text-white transition-colors" title="Reset Zoom">
+                        100%
+                    </button>
+                    <button id="btn-zoom-out" class="p-2 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white transition-colors" title="Zoom Out (-)">
+                        <i class="fa-solid fa-magnifying-glass-minus"></i>
+                    </button>
+                </div>
+
+            </main>
+        </div>
+
+        <!-- BOTTOM CONTROLS & THUMBNAIL STRIP -->
+        <footer id="bottom-bar" class="glass-panel z-30 flex flex-col shrink-0 transition-transform duration-300">
+            <!-- Progress Bar Top Border -->
+            <div id="progress-bar-container" class="w-full h-1.5 bg-gray-800/80 cursor-pointer relative">
+                <div id="progress-bar" class="h-full bg-brand-500 w-0 transition-all duration-200"></div>
+            </div>
+
+            <!-- Controls Toolbar -->
+            <div class="h-12 px-4 flex items-center justify-between text-xs sm:text-sm">
+                <div class="flex items-center space-x-2">
+                    <button id="btn-prev-page" class="p-1.5 rounded-md hover:bg-white/10 text-gray-300 hover:text-white" title="Previous Page (Left Arrow)">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <span id="page-indicator" class="font-medium text-gray-300 min-w-[60px] text-center">0 / 0</span>
+                    <button id="btn-next-page" class="p-1.5 rounded-md hover:bg-white/10 text-gray-300 hover:text-white" title="Next Page (Right Arrow)">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+
+                <!-- Page Slider -->
+                <div class="flex-1 max-w-md mx-4 hidden md:flex items-center space-x-2">
+                    <input type="range" id="page-slider" min="1" max="1" value="1" class="w-full accent-brand-500 cursor-pointer bg-gray-700 h-1 rounded-lg appearance-none">
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button id="btn-toggle-strip" class="p-1.5 rounded-md hover:bg-white/10 text-gray-300 hover:text-white transition-colors" title="Toggle Thumbnail Strip">
+                        <i class="fa-solid fa-film"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- THUMBNAIL BOTTOM STRIP (Collapsible) -->
+            <div id="thumbnail-strip" class="hidden h-24 border-t border-white/10 bg-black/40 overflow-x-auto no-scrollbar p-2 flex space-x-2 items-center">
+                <!-- Dynamically populated horizontally -->
+            </div>
+        </footer>
+
+        <!-- MODAL: NOTIFICATION / ALERT TOAST -->
+        <div id="toast" class="fixed bottom-16 left-1/2 -translate-x-1/2 bg-gray-900 border border-brand-500/30 text-white px-4 py-2 rounded-xl shadow-2xl z-50 text-xs sm:text-sm opacity-0 pointer-events-none transition-all duration-300 flex items-center space-x-2">
+            <i class="fa-solid fa-circle-info text-brand-400"></i>
+            <span id="toast-message">Notification message</span>
+        </div>
+    </div>
+
+
 </div>
 <script>
   document.getElementById('btn-sidebar-toggle').addEventListener('click',()=>{const s=document.getElementById('library-sidebar');if(window.matchMedia('(max-width:700px)').matches){s.style.display=s.style.display==='none'?'flex':'none';}else{s.style.display=s.style.display==='none'?'flex':'none';}});
@@ -579,6 +728,9 @@
         });
         if (!res.ok) throw await errorDrive(res, 'No se pudo descargar el cómic');
         const blob = await res.blob();
+        estado('Abriendo en ComicVault...');
+        await cargarCBZDesdeDrive(blob, fileName);
+        return;
 
         estado('Descomprimiendo páginas...');
         const zip = await JSZip.loadAsync(blob);
@@ -611,7 +763,7 @@
         }
 
         nombreComicActual = fileName;
-      const titleEl = $('comic-title'); if (titleEl) titleEl.textContent = fileName;
+      const titleEl = $('drive-comic-title'); if (titleEl) titleEl.textContent = fileName;
         paginaActual = 0;
         $('visor').style.display = 'block';
         aplicarConfigVista();
@@ -619,6 +771,8 @@
       } catch (err) {
         console.error('Error al abrir el cómic:', err);
         $('visor').style.display = 'none';
+        if ($('comicvault-reader')) $('comicvault-reader').style.display = 'none';
+        $('app-shell').style.display = 'flex';
         if ($('reader-home')) $('reader-home').style.display = 'flex';
         $('biblioteca').style.display = 'flex';
         $('estado').style.display = 'block';
@@ -705,5 +859,666 @@
     // No se usan gestos de deslizamiento para cambiar de página:
     // así el desplazamiento/zoom táctil en móviles no cambia accidentalmente de imagen.
   </script>
+    <script>
+        /**
+         * Comic Vault Reader Application State
+         */
+        const state = {
+            zip: null,
+            pageFiles: [],       // Array of JSZip file objects sorted by name
+            pageUrls: [],        // Blob URLs for rendered pages
+            currentPage: 0,      // 0-indexed page index
+            isDoublePage: false,
+            readingDirection: 'LTR', // 'LTR' or 'RTL'
+            fitMode: 'height',   // 'height', 'width', 'original'
+            zoomLevel: 1,        // Scale multiplier
+            panX: 0,
+            panY: 0,
+            isDragging: false,
+            startX: 0,
+            startY: 0,
+            bookmarks: [],       // Array of page indexes
+            theme: 'default',
+            sidebarOpen: false,
+            stripOpen: false,
+        };
+
+        // DOM Element Cache
+        const elements = {
+            app: document.getElementById('app'),
+            dropzone: document.getElementById('dropzone'),
+            fileInput: document.getElementById('file-input'),
+            btnOpenFile: document.getElementById('btn-open-file'),
+            comicTitle: document.getElementById('comic-title'),
+            pagesContainer: document.getElementById('pages-container'),
+            canvasWrapper: document.getElementById('canvas-wrapper'),
+            
+            // Sidebar
+            sidebar: document.getElementById('sidebar'),
+            btnSidebarToggle: document.getElementById('btn-sidebar-toggle'),
+            tabBtnThumbs: document.getElementById('tab-btn-thumbs'),
+            tabBtnBookmarks: document.getElementById('tab-btn-bookmarks'),
+            tabContentThumbs: document.getElementById('tab-content-thumbs'),
+            tabContentBookmarks: document.getElementById('tab-content-bookmarks'),
+            sidebarInfoPages: document.getElementById('sidebar-info-pages'),
+            bookmarkCount: document.getElementById('bookmark-count'),
+            btnAddBookmark: document.getElementById('btn-add-bookmark'),
+
+            // Navigation
+            btnPrevPage: document.getElementById('btn-prev-page'),
+            btnNextPage: document.getElementById('btn-next-page'),
+            btnPrevOverlay: document.getElementById('btn-prev-overlay'),
+            btnNextOverlay: document.getElementById('btn-next-overlay'),
+            pageIndicator: document.getElementById('page-indicator'),
+            pageSlider: document.getElementById('page-slider'),
+            progressBar: document.getElementById('progress-bar'),
+            progressBarContainer: document.getElementById('progress-bar-container'),
+
+            // Toolbar Controls
+            btnPageMode: document.getElementById('btn-page-mode'),
+            btnReadingDir: document.getElementById('btn-reading-dir'),
+            btnFullscreen: document.getElementById('btn-fullscreen'),
+            btnSettings: document.getElementById('btn-settings'),
+            settingsMenu: document.getElementById('settings-menu'),
+            
+            // Zoom Controls
+            btnZoomIn: document.getElementById('btn-zoom-in'),
+            btnZoomOut: document.getElementById('btn-zoom-out'),
+            btnZoomReset: document.getElementById('btn-zoom-reset'),
+
+            // Thumbnail Strip
+            btnToggleStrip: document.getElementById('btn-toggle-strip'),
+            thumbnailStrip: document.getElementById('thumbnail-strip'),
+
+            // Toast
+            toast: document.getElementById('toast'),
+            toastMessage: document.getElementById('toast-message'),
+        };
+
+        /**
+         * Initialize Event Listeners & Configuration
+         */
+        function init() {
+            setupFileHandlers();
+            setupNavigation();
+            setupZoomAndPan();
+            setupUIControls();
+            setupKeyboardShortcuts();
+        }
+
+        /**
+         * Toast Notification Helper
+         */
+        function showToast(msg) {
+            elements.toastMessage.textContent = msg;
+            elements.toast.classList.remove('opacity-0', 'pointer-events-none');
+            elements.toast.classList.add('opacity-100');
+            setTimeout(() => {
+                elements.toast.classList.remove('opacity-100');
+                elements.toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 2500);
+        }
+
+        /**
+         * File Dropzone and Input Handling
+         */
+        function setupFileHandlers() {
+            // Drag and Drop
+            window.addEventListener('dragover', (e) => e.preventDefault());
+            window.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files.length > 0) {
+                    handleFileSelect(e.dataTransfer.files[0]);
+                }
+            });
+
+            elements.dropzone.addEventListener('click', () => volverBiblioteca());
+            elements.btnOpenFile.addEventListener('click', () => volverBiblioteca());
+
+            elements.fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileSelect(e.target.files[0]);
+                }
+            });
+        }
+
+        /**
+         * Read and Parse Selected CBZ/ZIP File
+         */
+        async function handleFileSelect(file) {
+            if (!file.name.match(/\.(cbz|zip)$/i)) {
+                showToast('Please select a valid .cbz or .zip comic file');
+                return;
+            }
+
+            elements.comicTitle.textContent = file.name;
+            showToast('Opening comic archive...');
+
+            try {
+                // Clear old Blob URLs
+                state.pageUrls.forEach(url => URL.revokeObjectURL(url));
+                state.pageUrls = [];
+                state.pageFiles = [];
+                state.bookmarks = [];
+                state.currentPage = 0;
+
+                const zip = new JSZip();
+                const contents = await zip.loadAsync(file);
+
+                // Filter valid image files and sort alphabetically
+                const validExtensions = /\.(jpg|jpeg|png|webp|gif|avif)$/i;
+                const imageEntries = Object.keys(contents.files)
+                    .filter(filename => !contents.files[filename].dir && validExtensions.test(filename))
+                    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+                if (imageEntries.length === 0) {
+                    showToast('No valid images found in the archive.');
+                    return;
+                }
+
+                state.pageFiles = imageEntries.map(name => contents.files[name]);
+                state.zip = contents;
+
+                // Hide dropzone
+                elements.dropzone.classList.add('hidden');
+
+                // Generate thumbnails & pre-load pages
+                await buildThumbnails();
+                await renderCurrentView();
+                updateUIState();
+
+                showToast(`Loaded ${state.pageFiles.length} pages successfully!`);
+            } catch (err) {
+                console.error(err);
+                showToast('Error reading CBZ archive file.');
+            }
+        }
+
+        /**
+         * Load Image Blob URL for a Specific Page Index
+         */
+        async function getPageUrl(index) {
+            if (index < 0 || index >= state.pageFiles.length) return null;
+            if (state.pageUrls[index]) return state.pageUrls[index];
+
+            const fileObj = state.pageFiles[index];
+            const blob = await fileObj.async('blob');
+            const url = URL.createObjectURL(blob);
+            state.pageUrls[index] = url;
+            return url;
+        }
+
+        /**
+         * Render Main Canvas View (Single / Double Page)
+         */
+        async function renderCurrentView() {
+            if (state.pageFiles.length === 0) return;
+
+            elements.pagesContainer.innerHTML = '';
+            resetZoomPan();
+
+            const isDouble = state.isDoublePage && (state.currentPage < state.pageFiles.length - 1);
+            const pageIndices = isDouble ? [state.currentPage, state.currentPage + 1] : [state.currentPage];
+
+            if (state.readingDirection === 'RTL') {
+                pageIndices.reverse();
+            }
+
+            for (const idx of pageIndices) {
+                const url = await getPageUrl(idx);
+                if (!url) continue;
+
+                const img = document.createElement('img');
+                img.src = url;
+                img.className = 'select-none rounded shadow-2xl object-contain transition-all duration-200';
+                
+                // Fit mode styling
+                if (state.fitMode === 'height') {
+                    img.style.maxHeight = 'calc(100vh - 7rem)';
+                    img.style.width = 'auto';
+                } else if (state.fitMode === 'width') {
+                    img.style.maxWidth = '100%';
+                    img.style.height = 'auto';
+                } else {
+                    img.style.maxWidth = 'none';
+                    img.style.maxHeight = 'none';
+                }
+
+                elements.pagesContainer.appendChild(img);
+            }
+
+            updateUIState();
+        }
+
+        /**
+         * Build Sidebar & Bottom Thumbnail Strips
+         */
+        async function buildThumbnails() {
+            elements.tabContentThumbs.innerHTML = '';
+            elements.thumbnailStrip.innerHTML = '';
+
+            for (let i = 0; i < state.pageFiles.length; i++) {
+                // Sidebar Grid Thumbnail Card
+                const thumbCard = document.createElement('div');
+                thumbCard.className = `sidebar-thumb flex flex-col items-center cursor-pointer p-1.5 rounded-lg border border-white/5 bg-white/5 hover:border-brand-500 hover:bg-brand-500/10 transition-all ${i === state.currentPage ? 'border-brand-500 bg-brand-500/20' : ''}`;
+                thumbCard.dataset.index = i;
+
+                thumbCard.innerHTML = `
+                    <div class="w-full aspect-[2/3] bg-black/40 rounded flex items-center justify-center overflow-hidden mb-1">
+                        <i class="fa-solid fa-image text-gray-600 text-lg lazy-icon"></i>
+                        <img class="w-full h-full object-cover hidden" lazy-src="${i}">
+                    </div>
+                    <span class="text-[10px] text-gray-400 font-semibold">Page ${i + 1}</span>
+                `;
+
+                thumbCard.addEventListener('click', () => goToPage(i));
+                elements.tabContentThumbs.appendChild(thumbCard);
+
+                // Bottom Strip Thumbnail
+                const stripCard = document.createElement('div');
+                stripCard.className = `strip-thumb shrink-0 h-20 aspect-[2/3] bg-black/40 rounded border border-white/10 cursor-pointer overflow-hidden hover:border-brand-500 relative transition-all ${i === state.currentPage ? 'ring-2 ring-brand-500 border-transparent' : ''}`;
+                stripCard.dataset.index = i;
+                stripCard.innerHTML = `
+                    <img class="w-full h-full object-cover hidden" lazy-src="${i}">
+                    <span class="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] text-center py-0.5 text-gray-300 font-bold">${i + 1}</span>
+                `;
+                stripCard.addEventListener('click', () => goToPage(i));
+                elements.thumbnailStrip.appendChild(stripCard);
+            }
+
+            // Lazy load first few thumbnails
+            loadVisibleThumbnails();
+        }
+
+        /**
+         * Lazy Load Thumbnail Images asynchronously
+         */
+        async function loadVisibleThumbnails() {
+            const lazyImgs = document.querySelectorAll('img[lazy-src]');
+            for (const img of lazyImgs) {
+                const idx = parseInt(img.getAttribute('lazy-src'));
+                if (img.classList.contains('hidden')) {
+                    const url = await getPageUrl(idx);
+                    img.src = url;
+                    img.classList.remove('hidden');
+                    const icon = img.previousElementSibling;
+                    if (icon && icon.classList.contains('lazy-icon')) {
+                        icon.remove();
+                    }
+                }
+            }
+        }
+
+        /**
+         * Update Navigation & UI Controls State
+         */
+        function updateUIState() {
+            const total = state.pageFiles.length;
+            const current = total === 0 ? 0 : state.currentPage + 1;
+            
+            // Text indicators
+            elements.pageIndicator.textContent = `${current} / ${total}`;
+            elements.sidebarInfoPages.textContent = `${current} / ${total} pages`;
+            elements.pageSlider.max = total || 1;
+            elements.pageSlider.value = current;
+
+            // Progress Bar
+            const percent = total > 1 ? (state.currentPage / (total - 1)) * 100 : 0;
+            elements.progressBar.style.width = `${percent}%`;
+
+            // Active Thumbnail Highlights
+            document.querySelectorAll('.sidebar-thumb').forEach((el, idx) => {
+                if (idx === state.currentPage) {
+                    el.classList.add('border-brand-500', 'bg-brand-500/20');
+                    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                } else {
+                    el.classList.remove('border-brand-500', 'bg-brand-500/20');
+                }
+            });
+
+            document.querySelectorAll('.strip-thumb').forEach((el, idx) => {
+                if (idx === state.currentPage) {
+                    el.classList.add('ring-2', 'ring-brand-500');
+                    el.scrollIntoView({ inline: 'center', behavior: 'smooth' });
+                } else {
+                    el.classList.remove('ring-2', 'ring-brand-500');
+                }
+            });
+
+            // Update Bookmark Button Icon
+            const isBookmarked = state.bookmarks.includes(state.currentPage);
+            const bmIcon = elements.btnAddBookmark.querySelector('i');
+            if (isBookmarked) {
+                bmIcon.className = 'fa-solid fa-bookmark text-sm text-yellow-500';
+            } else {
+                bmIcon.className = 'fa-regular fa-bookmark text-sm';
+            }
+        }
+
+        /**
+         * Navigation Functions
+         */
+        function goToPage(index) {
+            if (index < 0) index = 0;
+            if (index >= state.pageFiles.length) index = state.pageFiles.length - 1;
+            if (index === state.currentPage) return;
+
+            state.currentPage = index;
+            renderCurrentView();
+        }
+
+        function nextPage() {
+            const step = state.isDoublePage ? 2 : 1;
+            if (state.currentPage + step < state.pageFiles.length) {
+                goToPage(state.currentPage + step);
+            } else if (state.currentPage < state.pageFiles.length - 1) {
+                goToPage(state.pageFiles.length - 1);
+            }
+        }
+
+        function prevPage() {
+            const step = state.isDoublePage ? 2 : 1;
+            if (state.currentPage - step >= 0) {
+                goToPage(state.currentPage - step);
+            } else if (state.currentPage > 0) {
+                goToPage(0);
+            }
+        }
+
+        function setupNavigation() {
+            elements.btnNextPage.addEventListener('click', nextPage);
+            elements.btnPrevPage.addEventListener('click', prevPage);
+            elements.btnNextOverlay.addEventListener('click', nextPage);
+            elements.btnPrevOverlay.addEventListener('click', prevPage);
+
+            // Slider input
+            elements.pageSlider.addEventListener('input', (e) => {
+                goToPage(parseInt(e.target.value) - 1);
+            });
+
+            // Progress bar click navigation
+            elements.progressBarContainer.addEventListener('click', (e) => {
+                const rect = elements.progressBarContainer.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const ratio = clickX / rect.width;
+                const targetPage = Math.floor(ratio * state.pageFiles.length);
+                goToPage(targetPage);
+            });
+        }
+
+        /**
+         * Pan and Zoom Engine
+         */
+        function setupZoomAndPan() {
+            const applyTransform = () => {
+                elements.pagesContainer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`;
+                elements.btnZoomReset.textContent = `${Math.round(state.zoomLevel * 100)}%`;
+            };
+
+            const setZoom = (newZoom) => {
+                state.zoomLevel = Math.max(0.5, Math.min(3.5, newZoom));
+                if (state.zoomLevel === 1) {
+                    state.panX = 0;
+                    state.panY = 0;
+                }
+                applyTransform();
+            };
+
+            elements.btnZoomIn.addEventListener('click', () => setZoom(state.zoomLevel + 0.25));
+            elements.btnZoomOut.addEventListener('click', () => setZoom(state.zoomLevel - 0.25));
+            elements.btnZoomReset.addEventListener('click', () => resetZoomPan());
+
+            // Mouse wheel zoom
+            elements.canvasWrapper.addEventListener('wheel', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    const delta = e.deltaY < 0 ? 0.15 : -0.15;
+                    setZoom(state.zoomLevel + delta);
+                }
+            }, { passive: false });
+
+            // Drag / Pan capability
+            elements.canvasWrapper.addEventListener('mousedown', (e) => {
+                if (state.zoomLevel > 1) {
+                    state.isDragging = true;
+                    state.startX = e.clientX - state.panX;
+                    state.startY = e.clientY - state.panY;
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (state.isDragging) {
+                    state.panX = e.clientX - state.startX;
+                    state.panY = e.clientY - state.startY;
+                    applyTransform();
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                state.isDragging = false;
+            });
+        }
+
+        function resetZoomPan() {
+            state.zoomLevel = 1;
+            state.panX = 0;
+            state.panY = 0;
+            elements.pagesContainer.style.transform = `translate(0px, 0px) scale(1)`;
+            elements.btnZoomReset.textContent = `100%`;
+        }
+
+        /**
+         * General UI Controls (Sidebar, Bookmarks, Fullscreen, Themes)
+         */
+        function setupUIControls() {
+            // Sidebar Toggle
+            elements.btnSidebarToggle.addEventListener('click', () => {
+                state.sidebarOpen = !state.sidebarOpen;
+                if (state.sidebarOpen) {
+                    elements.sidebar.classList.remove('-translate-x-full');
+                } else {
+                    elements.sidebar.classList.add('-translate-x-full');
+                }
+            });
+
+            // Sidebar Tabs
+            elements.tabBtnThumbs.addEventListener('click', () => {
+                elements.tabBtnThumbs.className = 'flex-1 py-3 border-b-2 border-brand-500 text-brand-400 text-center font-semibold';
+                elements.tabBtnBookmarks.className = 'flex-1 py-3 border-b-2 border-transparent text-gray-400 hover:text-gray-200 text-center';
+                elements.tabContentThumbs.classList.remove('hidden');
+                elements.tabContentBookmarks.classList.add('hidden');
+            });
+
+            elements.tabBtnBookmarks.addEventListener('click', () => {
+                elements.tabBtnBookmarks.className = 'flex-1 py-3 border-b-2 border-brand-500 text-brand-400 text-center font-semibold';
+                elements.tabBtnThumbs.className = 'flex-1 py-3 border-b-2 border-transparent text-gray-400 hover:text-gray-200 text-center';
+                elements.tabContentBookmarks.classList.remove('hidden');
+                elements.tabContentThumbs.classList.add('hidden');
+            });
+
+            // Bookmark Toggle
+            elements.btnAddBookmark.addEventListener('click', () => {
+                const idx = state.currentPage;
+                const bmIndex = state.bookmarks.indexOf(idx);
+                if (bmIndex > -1) {
+                    state.bookmarks.splice(bmIndex, 1);
+                    showToast(`Bookmark removed for page ${idx + 1}`);
+                } else {
+                    state.bookmarks.push(idx);
+                    showToast(`Page ${idx + 1} bookmarked!`);
+                }
+                renderBookmarksList();
+                updateUIState();
+            });
+
+            // Single / Double Page View Toggle
+            elements.btnPageMode.addEventListener('click', () => {
+                state.isDoublePage = !state.isDoublePage;
+                elements.btnPageMode.classList.toggle('text-brand-400', state.isDoublePage);
+                showToast(state.isDoublePage ? 'Double Page Display' : 'Single Page Display');
+                renderCurrentView();
+            });
+
+            // Reading Direction Toggle
+            elements.btnReadingDir.addEventListener('click', () => {
+                state.readingDirection = state.readingDirection === 'LTR' ? 'RTL' : 'LTR';
+                elements.btnReadingDir.innerHTML = state.readingDirection === 'LTR' 
+                    ? '<i class="fa-solid fa-arrow-right-to-line text-lg"></i>' 
+                    : '<i class="fa-solid fa-arrow-left-to-line text-lg text-brand-400"></i>';
+                showToast(`Reading Direction: ${state.readingDirection}`);
+                renderCurrentView();
+            });
+
+            // Fullscreen Toggle
+            elements.btnFullscreen.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(err => console.error(err));
+                } else {
+                    document.exitFullscreen();
+                }
+            });
+
+            // Settings Menu Toggle
+            elements.btnSettings.addEventListener('click', (e) => {
+                e.stopPropagation();
+                elements.settingsMenu.classList.toggle('hidden');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!elements.settingsMenu.contains(e.target) && !elements.btnSettings.contains(e.target)) {
+                    elements.settingsMenu.classList.add('hidden');
+                }
+            });
+
+            // Theme Options
+            document.querySelectorAll('.theme-opt').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const theme = btn.dataset.theme;
+                    document.body.className = `bg-darkbg text-gray-100 font-sans h-full overflow-hidden select-none theme-${theme}`;
+                    showToast(`Theme updated`);
+                });
+            });
+
+            // Fit Mode Options
+            document.querySelectorAll('.fit-opt').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.fitMode = btn.dataset.fit;
+                    document.querySelectorAll('.fit-opt').forEach(b => b.classList.remove('bg-brand-600', 'text-white'));
+                    btn.classList.add('bg-brand-600', 'text-white');
+                    renderCurrentView();
+                });
+            });
+
+            // Bottom Thumbnail Strip Toggle
+            elements.btnToggleStrip.addEventListener('click', () => {
+                state.stripOpen = !state.stripOpen;
+                elements.thumbnailStrip.classList.toggle('hidden', !state.stripOpen);
+                elements.btnToggleStrip.classList.toggle('text-brand-400', state.stripOpen);
+            });
+        }
+
+        /**
+         * Render Bookmarks List inside Sidebar
+         */
+        function renderBookmarksList() {
+            elements.bookmarkCount.textContent = state.bookmarks.length;
+            elements.tabContentBookmarks.innerHTML = '';
+
+            if (state.bookmarks.length === 0) {
+                elements.tabContentBookmarks.innerHTML = '<div class="text-center text-xs text-gray-500 py-10">No bookmarks saved for this issue.</div>';
+                return;
+            }
+
+            state.bookmarks.sort((a, b) => a - b).forEach(pageIdx => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-2 rounded-lg bg-white/5 hover:bg-brand-500/20 border border-white/5 cursor-pointer text-xs transition-colors';
+                item.innerHTML = `
+                    <span class="font-medium text-gray-200">Page ${pageIdx + 1}</span>
+                    <button class="remove-bm p-1 text-gray-400 hover:text-red-400" title="Remove Bookmark">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                `;
+
+                item.addEventListener('click', (e) => {
+                    if (e.target.closest('.remove-bm')) {
+                        e.stopPropagation();
+                        const index = state.bookmarks.indexOf(pageIdx);
+                        if (index > -1) state.bookmarks.splice(index, 1);
+                        renderBookmarksList();
+                        updateUIState();
+                    } else {
+                        goToPage(pageIdx);
+                    }
+                });
+
+                elements.tabContentBookmarks.appendChild(item);
+            });
+        }
+
+        /**
+         * Keyboard Shortcuts
+         */
+        function setupKeyboardShortcuts() {
+            window.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT') return;
+
+                switch (e.key) {
+                    case 'ArrowRight':
+                    case 'd':
+                    case 'D':
+                        state.readingDirection === 'LTR' ? nextPage() : prevPage();
+                        break;
+                    case 'ArrowLeft':
+                    case 'a':
+                    case 'A':
+                        state.readingDirection === 'LTR' ? prevPage() : nextPage();
+                        break;
+                    case 'f':
+                    case 'F':
+                        elements.btnFullscreen.click();
+                        break;
+                    case 't':
+                    case 'T':
+                        elements.btnSidebarToggle.click();
+                        break;
+                    case 'b':
+                    case 'B':
+                        elements.btnAddBookmark.click();
+                        break;
+                    case '+':
+                    case '=':
+                        elements.btnZoomIn.click();
+                        break;
+                    case '-':
+                        elements.btnZoomOut.click();
+                        break;
+                    case '0':
+                        resetZoomPan();
+                        break;
+                }
+            });
+        }
+
+        // Initialize application on load
+        window.addEventListener('load', init);
+
+        async function cargarCBZDesdeDrive(file, fileName) {
+            const wrapped = new File([file], fileName, { type: 'application/vnd.comicbook+zip' });
+            elements.app.classList.remove('hidden');
+            elements.app.classList.add('flex');
+            document.getElementById('app-shell').style.display = 'none';
+            document.getElementById('comicvault-reader').style.display = 'block';
+            await handleFileSelect(wrapped);
+        }
+
+        function volverBiblioteca() {
+            document.getElementById('comicvault-reader').style.display = 'none';
+            document.getElementById('app-shell').style.display = 'flex';
+        }
+        document.getElementById('btn-reader-logout').addEventListener('click', () => {
+            volverBiblioteca();
+            if (typeof cerrarSesion === 'function') cerrarSesion();
+        });
+    </script>
 </body>
 </html>
