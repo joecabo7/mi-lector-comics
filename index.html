@@ -34,7 +34,12 @@
     .visor-barra select { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
     #comic-img { transform-origin: 0 0; touch-action: none; }
     #paginas-contenedor.zoom-activo { overflow: hidden; }
-    .visor-barra select { max-width: 175px; min-width: 0; padding: 9px 7px; color: #fff; background: #242424; border: 1px solid #666; border-radius: 5px; font-size: 14px; }
+    .visor-barra select { max-width: 175px; min-width: 0; padding: 9px 7px; color: #fff; background: rgba(36,36,36,.82); border: 1px solid rgba(255,255,255,.25); border-radius: 5px; font-size: 14px; }
+    #sensibilidad-control { display:flex; align-items:center; gap:6px; padding:6px 9px; color:#fff; background:rgba(25,25,25,.72); border:1px solid rgba(255,255,255,.2); border-radius:6px; font-size:12px; backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
+    #sensibilidad-mouse { width:90px; accent-color:#168cff; }
+    #sensibilidad-valor { min-width:22px; text-align:right; }
+    #btn-cerrar-comic { background:rgba(220,53,69,.82) !important; }
+    #btn-cerrar-comic:hover { background:rgba(189,33,48,.94) !important; }
     #paginas-contenedor { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y pinch-zoom; }
     #paginas-contenedor.modo-una { display: flex; justify-content: center; align-items: flex-start; }
     #paginas-contenedor.ajuste-pantalla { align-items: center; }
@@ -57,6 +62,7 @@
       .visor-barra { left: 5px; right: 5px; gap: 4px; }
       .visor-barra .btn { padding: 8px 9px; font-size: 12px; }
       .visor-barra select { max-width: 120px; padding: 8px 5px; font-size: 12px; }
+      #sensibilidad-control { display:none; }
     }
   </style>
 </head>
@@ -92,7 +98,8 @@
         <option value="pantalla">Ajustar pantalla</option>
         <option value="ancho">Ajustar ancho</option>
       </select>
-      <button class="btn" type="button" id="btn-cerrar-comic" class="btn-peligro" aria-label="Cerrar cómic" title="Cerrar cómic">✕</button>
+      <label id="sensibilidad-control" for="sensibilidad-mouse" title="Sensibilidad del movimiento con el cursor">Movimiento <input id="sensibilidad-mouse" type="range" min="1" max="100" value="30"><span id="sensibilidad-valor">30</span></label>
+      <button class="btn btn-peligro" type="button" id="btn-cerrar-comic" aria-label="Cerrar cómic" title="Cerrar cómic">✕</button>
     </div>
     <div id="paginas-contenedor" class="modo-una ajuste-pantalla">
       <img id="comic-img" src="" alt="Página del cómic">
@@ -107,6 +114,9 @@
 
     let accessToken = null;
     let tokenClient = null;
+    const CLAVE_SESION_GOOGLE = 'mi_lector_comics_google_autorizado';
+    let recordarSesionGoogle = false;
+    try { recordarSesionGoogle = localStorage.getItem(CLAVE_SESION_GOOGLE) === '1'; } catch (_) {}
     let paginasComic = [];
     let paginaActual = 0;
     let nombreComicActual = '';
@@ -114,15 +124,17 @@
     let configVista = cargarConfigVista();
     let escalaZoom = 1, desplazamientoX = 0, desplazamientoY = 0;
     let gestoZoom = null;
+    let ultimoMouse = null;
+    let sensibilidadMouse = 30;
 
     const $ = (id) => document.getElementById(id);
 
     function cargarConfigVista() {
-      const predeterminada = { modo: 'una', ajuste: 'pantalla' };
+      const predeterminada = { modo: 'una', ajuste: 'pantalla', sensibilidad: 30 };
       try {
         const guardada = JSON.parse(localStorage.getItem('mi_lector_comics_config_vista') || 'null');
         if (guardada && ['una', 'vertical', 'horizontal'].includes(guardada.modo) &&
-            ['pantalla', 'ancho'].includes(guardada.ajuste)) return guardada;
+            ['pantalla', 'ancho'].includes(guardada.ajuste)) return { ...predeterminada, ...guardada, sensibilidad: Math.max(1, Math.min(100, Number(guardada.sensibilidad) || 30)) };
       } catch (_) {}
       return predeterminada;
     }
@@ -132,6 +144,9 @@
     }
 
     function aplicarConfigVista() {
+      sensibilidadMouse = Math.max(1, Math.min(100, Number(configVista.sensibilidad) || 30));
+      $('sensibilidad-mouse').value = sensibilidadMouse;
+      $('sensibilidad-valor').textContent = sensibilidadMouse;
       const cont = $('paginas-contenedor');
       cont.classList.remove('modo-una', 'modo-multiple-vertical', 'modo-multiple-horizontal', 'ajuste-pantalla', 'ajuste-ancho');
       cont.classList.add(configVista.modo === 'una' ? 'modo-una' :
@@ -182,12 +197,17 @@
     function aplicarZoom() {
       const img = $('comic-img');
       const cont = $('paginas-contenedor');
-      if (!img) return;
-      if (escalaZoom <= 1) {
-        reiniciarZoom();
+      if (!img || !cont) return;
+      if (escalaZoom <= 1 && Math.abs(desplazamientoX) < 0.5 && Math.abs(desplazamientoY) < 0.5) {
+        escalaZoom = 1;
+        desplazamientoX = 0;
+        desplazamientoY = 0;
+        img.style.transform = '';
+        cont.classList.remove('zoom-activo');
         return;
       }
-      cont.classList.add('zoom-activo');
+      cont.classList.toggle('zoom-activo', escalaZoom > 1);
+      img.style.transformOrigin = '0 0';
       img.style.transform = `translate(${desplazamientoX}px, ${desplazamientoY}px) scale(${escalaZoom})`;
     }
 
@@ -200,16 +220,26 @@
         if (e.touches.length === 2) {
           e.preventDefault();
           const a = e.touches[0], b = e.touches[1];
-          gestoZoom = { tipo: 'pinza', distancia: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY), escala: escalaZoom };
+          const centroX = (a.clientX + b.clientX) / 2;
+          const centroY = (a.clientY + b.clientY) / 2;
+          // Guarda el punto de la imagen que queda justo debajo del centro de los dedos.
+          const rect = img.getBoundingClientRect();
+          gestoZoom = {
+            tipo: 'pinza',
+            distancia: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY),
+            escala: escalaZoom,
+            baseX: rect.left - desplazamientoX,
+            baseY: rect.top - desplazamientoY,
+            puntoX: (centroX - rect.left) / escalaZoom,
+            puntoY: (centroY - rect.top) / escalaZoom
+          };
         } else if (e.touches.length === 1 && escalaZoom > 1) {
           const t = e.touches[0];
           gestoZoom = { tipo: 'mover', x: t.clientX, y: t.clientY, dx: desplazamientoX, dy: desplazamientoY };
         } else if (e.touches.length === 1 && escalaZoom === 1) {
           const t = e.touches[0];
           gestoZoom = { tipo: 'scroll', x: t.clientX, y: t.clientY, left: cont.scrollLeft, top: cont.scrollTop };
-        } else {
-          gestoZoom = null;
-        }
+        } else gestoZoom = null;
       };
       cont.ontouchmove = (e) => {
         if (!gestoZoom || configVista.modo !== 'una') return;
@@ -217,8 +247,16 @@
           e.preventDefault();
           const a = e.touches[0], b = e.touches[1];
           const distancia = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+          const nuevoCentroX = (a.clientX + b.clientX) / 2;
+          const nuevoCentroY = (a.clientY + b.clientY) / 2;
           escalaZoom = Math.max(1, Math.min(5, gestoZoom.escala * distancia / Math.max(1, gestoZoom.distancia)));
-          if (escalaZoom === 1) { desplazamientoX = 0; desplazamientoY = 0; }
+          // Mantiene el punto bajo los dedos fijo mientras se amplía o se pellizca.
+          desplazamientoX = nuevoCentroX - gestoZoom.baseX - gestoZoom.puntoX * escalaZoom;
+          desplazamientoY = nuevoCentroY - gestoZoom.baseY - gestoZoom.puntoY * escalaZoom;
+          if (escalaZoom === 1) {
+            desplazamientoX = 0;
+            desplazamientoY = 0;
+          }
           aplicarZoom();
         } else if (gestoZoom.tipo === 'mover' && e.touches.length === 1 && escalaZoom > 1) {
           e.preventDefault();
@@ -237,6 +275,22 @@
         if (!e.touches.length) gestoZoom = null;
       };
       cont.ondblclick = null;
+      // En PC, el cursor mueve la página en dirección contraria; la intensidad es configurable.
+      cont.onmouseenter = (e) => { ultimoMouse = { x: e.clientX, y: e.clientY }; };
+      cont.onmouseleave = () => { ultimoMouse = null; };
+      cont.onmousemove = (e) => {
+        if (e.pointerType === 'touch' || configVista.modo !== 'una') return;
+        if (!ultimoMouse) { ultimoMouse = { x: e.clientX, y: e.clientY }; return; }
+        const dx = e.clientX - ultimoMouse.x;
+        const dy = e.clientY - ultimoMouse.y;
+        ultimoMouse = { x: e.clientX, y: e.clientY };
+        const factor = sensibilidadMouse / 100;
+        const maxX = Math.max(40, cont.clientWidth * 0.45);
+        const maxY = Math.max(40, cont.clientHeight * 0.45);
+        desplazamientoX = Math.max(-maxX, Math.min(maxX, desplazamientoX - dx * factor));
+        desplazamientoY = Math.max(-maxY, Math.min(maxY, desplazamientoY - dy * factor));
+        aplicarZoom();
+      };
     }
 
     function alternarAjuste() {
@@ -254,6 +308,12 @@
       $('btn-conectar').addEventListener('click', iniciarAutenticacion);
       $('btn-salir').addEventListener('click', cerrarSesion);
       $('btn-cerrar-comic').addEventListener('click', cerrarVisor);
+      $('sensibilidad-mouse').addEventListener('input', () => {
+        sensibilidadMouse = Number($('sensibilidad-mouse').value);
+        configVista.sensibilidad = sensibilidadMouse;
+        $('sensibilidad-valor').textContent = sensibilidadMouse;
+        guardarConfigVista();
+      });
       $('btn-anterior').addEventListener('click', () => cambiarPagina(-1));
       $('btn-siguiente').addEventListener('click', () => cambiarPagina(1));
       $('modo-vista').addEventListener('change', () => {
@@ -302,6 +362,8 @@
             return;
           }
           accessToken = response.access_token;
+          recordarSesionGoogle = true;
+          try { localStorage.setItem(CLAVE_SESION_GOOGLE, '1'); } catch (_) {}
           $('btn-conectar').style.display = 'none';
           $('btn-salir').style.display = 'inline-block';
           estado('Conectado con Google Drive.');
@@ -310,9 +372,24 @@
         },
         error_callback: (error) => {
           console.error('Ventana OAuth:', error);
-          estado('No se pudo completar el inicio de sesión de Google. Revisa las ventanas emergentes y la configuración OAuth.', true);
+          $('btn-conectar').style.display = 'inline-block';
+          $('btn-conectar').textContent = '🔐 Reanudar sesión de Google Drive';
+          estado('Google no pudo recuperar la sesión automáticamente. Pulsa «Reanudar sesión» para continuar.', true);
         }
       });
+
+      // Si este navegador ya autorizó el lector, intenta recuperar el acceso sin volver a pedir consentimiento.
+      // Google puede exigir un clic o una nueva autorización por seguridad; en ese caso queda disponible el botón.
+      if (recordarSesionGoogle) {
+        $('btn-conectar').textContent = '🔐 Reanudar sesión de Google Drive';
+        estado('Intentando recuperar la sesión de Google Drive...');
+        try { tokenClient.requestAccessToken({ prompt: '' }); }
+        catch (error) {
+          console.warn('No se pudo recuperar automáticamente la sesión:', error);
+          $('btn-conectar').style.display = 'inline-block';
+          estado('Pulsa «Reanudar sesión» para recuperar el acceso a Google Drive.', true);
+        }
+      }
     });
 
     function iniciarAutenticacion() {
@@ -320,8 +397,8 @@
         estado('El servicio de Google aún no está listo. Recarga la página e inténtalo de nuevo.', true);
         return;
       }
-      // El token se solicita tras la acción directa del usuario.
-      tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
+      // Si ya se autorizó antes, solicita otro token sin repetir el consentimiento cuando Google lo permita.
+      tokenClient.requestAccessToken({ prompt: (accessToken || recordarSesionGoogle) ? '' : 'consent' });
     }
 
     async function buscarComics() {
@@ -520,6 +597,9 @@
         google.accounts.oauth2.revoke(accessToken, () => {});
       }
       accessToken = null;
+      recordarSesionGoogle = false;
+      try { localStorage.removeItem(CLAVE_SESION_GOOGLE); } catch (_) {}
+      $('btn-conectar').textContent = '🔐 Conectar con Google Drive';
       $('btn-conectar').style.display = 'inline-block';
       $('btn-salir').style.display = 'none';
       $('lista-comics').innerHTML = '';
