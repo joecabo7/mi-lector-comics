@@ -1440,13 +1440,12 @@
             elements.btnZoomOut.addEventListener('click', () => setZoom(state.zoomLevel - 0.25));
             elements.btnZoomReset.addEventListener('click', () => resetZoomPan());
 
-            // Mouse wheel zoom
+            // Usar la rueda del ratón como zoom directamente al pasar sobre el lector.
+            // Rueda hacia arriba: acercar; hacia abajo: alejar. Evita que la página se desplace.
             elements.canvasWrapper.addEventListener('wheel', (e) => {
-                if (e.ctrlKey || e.metaKey) {
-                    e.preventDefault();
-                    const delta = e.deltaY < 0 ? 0.15 : -0.15;
-                    setZoom(state.zoomLevel + delta);
-                }
+                e.preventDefault();
+                const delta = e.deltaY < 0 ? 0.15 : -0.15;
+                setZoom(state.zoomLevel + delta);
             }, { passive: false });
 
             // Gestos táctiles: pellizco para zoom, arrastre si está ampliada y deslizamiento para cambiar página.
