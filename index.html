@@ -1345,30 +1345,37 @@
          * Pan and Zoom Engine
          */
         function setupZoomAndPan() {
-            // Limita el desplazamiento al área del visor y mantiene la imagen accesible.
+            // Calcula límites en coordenadas del visor, evitando saltos al medir una transformación animada.
             const clampPan = () => {
                 const viewport = elements.canvasWrapper.getBoundingClientRect();
                 const content = elements.pagesContainer.getBoundingClientRect();
-                let dx = 0, dy = 0;
-                if (content.width <= viewport.width) {
-                    dx = (viewport.left + viewport.width / 2) - (content.left + content.width / 2);
-                } else if (content.left > viewport.left) {
-                    dx = viewport.left - content.left;
-                } else if (content.right < viewport.right) {
-                    dx = viewport.right - content.right;
+                const zoom = Math.max(0.01, state.zoomLevel);
+                const baseLeft = content.left - state.panX;
+                const baseTop = content.top - state.panY;
+                const baseWidth = content.width / zoom;
+                const baseHeight = content.height / zoom;
+                const scaledWidth = baseWidth * zoom;
+                const scaledHeight = baseHeight * zoom;
+
+                if (scaledWidth <= viewport.width) {
+                    state.panX = viewport.left + (viewport.width - scaledWidth) / 2 - baseLeft;
+                } else {
+                    const minX = viewport.right - scaledWidth - baseLeft;
+                    const maxX = viewport.left - baseLeft;
+                    state.panX = Math.max(minX, Math.min(maxX, state.panX));
                 }
-                if (content.height <= viewport.height) {
-                    dy = (viewport.top + viewport.height / 2) - (content.top + content.height / 2);
-                } else if (content.top > viewport.top) {
-                    dy = viewport.top - content.top;
-                } else if (content.bottom < viewport.bottom) {
-                    dy = viewport.bottom - content.bottom;
+                if (scaledHeight <= viewport.height) {
+                    state.panY = viewport.top + (viewport.height - scaledHeight) / 2 - baseTop;
+                } else {
+                    const minY = viewport.bottom - scaledHeight - baseTop;
+                    const maxY = viewport.top - baseTop;
+                    state.panY = Math.max(minY, Math.min(maxY, state.panY));
                 }
-                state.panX += dx;
-                state.panY += dy;
             };
 
             const applyTransform = () => {
+                // Desactivar transiciones durante el gesto evita que el rectángulo medido vaya retrasado.
+                elements.pagesContainer.style.transition = 'none';
                 elements.pagesContainer.style.transformOrigin = 'top left';
                 elements.pagesContainer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`;
                 clampPan();
@@ -1456,12 +1463,9 @@
                     if (touchMode === 'pan' || state.zoomLevel > 1) {
                         e.preventDefault();
                         touchMode = 'pan';
-                        const now = performance.now();
-                        const elapsed = Math.max(1, now - panLastTime);
-                        const speed = Math.hypot(dx, dy) / elapsed;
-                        const acceleration = Math.min(4.2, 1 + speed * 0.11);
-                        state.panX += dx * acceleration;
-                        state.panY += dy * acceleration;
+                        // Desplazamiento 1:1 con el dedo: evita aceleraciones bruscas que saquen la página.
+                        state.panX += dx;
+                        state.panY += dy;
                         applyTransform();
                         panLastTime = now;
                     }
@@ -1494,6 +1498,7 @@
 
             window.addEventListener('mousemove', (e) => {
                 if (state.isDragging) {
+                    e.preventDefault();
                     state.panX = e.clientX - state.startX;
                     state.panY = e.clientY - state.startY;
                     applyTransform();
