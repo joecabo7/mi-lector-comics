@@ -88,8 +88,6 @@
     window.addEventListener('load', () => {
       $('btn-conectar').addEventListener('click', iniciarAutenticacion);
       $('btn-salir').addEventListener('click', cerrarSesion);
-      $('btn-anterior').addEventListener('click', () => cambiarPagina(-1));
-      $('btn-siguiente').addEventListener('click', () => cambiarPagina(1));
       $('btn-cerrar-comic').addEventListener('click', cerrarVisor);
       $('btn-buscar').addEventListener('click', buscarComics);
       $('buscador').addEventListener('keydown', (e) => {
@@ -295,10 +293,6 @@
     function mostrarPagina() {
       if (!paginasComic.length) return;
       $('comic-img').src = paginasComic[paginaActual];
-      $('num-pagina').textContent = String(paginaActual + 1);
-      $('total-paginas').textContent = String(paginasComic.length);
-      $('btn-anterior').disabled = paginaActual === 0;
-      $('btn-siguiente').disabled = paginaActual === paginasComic.length - 1;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
