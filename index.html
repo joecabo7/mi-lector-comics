@@ -57,7 +57,7 @@
     #comicvault-reader #canvas-wrapper { touch-action:none; overscroll-behavior:contain; }
     #comicvault-reader #pages-container { will-change:transform; transform-origin:top left; }
     #comicvault-reader #pages-container img { display:block; }
-    #comicvault-reader #canvas-wrapper { overflow:auto; }
+    #comicvault-reader #canvas-wrapper { overflow:hidden; }
     #comicvault-reader #sidebar { min-height:0; }
     #comicvault-reader #tab-content-thumbs, #comicvault-reader #tab-content-bookmarks { min-height:0; overscroll-behavior:contain; }
     #comicvault-reader #settings-menu { max-width:calc(100vw - 16px); }
@@ -100,7 +100,7 @@
       #comicvault-reader #sidebar { position:absolute; z-index:40; top:0; bottom:0; left:0; width:min(82vw,280px); height:auto; }
       #comicvault-reader #bottom-bar .h-12 { height:42px; padding-left:8px; padding-right:8px; }
       #comicvault-reader #bottom-bar { padding-bottom:env(safe-area-inset-bottom); }
-      #comicvault-reader #canvas-wrapper { overflow:auto; }
+      #comicvault-reader #canvas-wrapper { overflow:hidden; }
       #comicvault-reader #pages-container img { max-width:100vw; max-height:calc(100svh - 100px); }
       #comicvault-reader .absolute.bottom-20.right-6 { right:8px; bottom:58px; }
       #comicvault-reader .absolute.bottom-20.right-6 button { padding:6px; }
@@ -1203,6 +1203,7 @@
                 elements.pagesContainer.appendChild(img);
             }
 
+            elements.pagesContainer.style.transformOrigin = 'top left';
             elements.pagesContainer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`;
             elements.btnZoomReset.textContent = `${Math.round(state.zoomLevel * 100)}%`;
             updateUIState();
@@ -1368,20 +1369,55 @@
          * Pan and Zoom Engine
          */
         function setupZoomAndPan() {
+            // Limita el desplazamiento al área del visor. Si el contenido es menor
+            // que el visor, lo centra; si es mayor, impide dejar bordes vacíos.
+            const clampPan = () => {
+                const viewport = elements.canvasWrapper.getBoundingClientRect();
+                const content = elements.pagesContainer.getBoundingClientRect();
+                let dx = 0, dy = 0;
+                if (content.width <= viewport.width) {
+                    dx = (viewport.left + viewport.width / 2) - (content.left + content.width / 2);
+                } else if (content.left > viewport.left) {
+                    dx = viewport.left - content.left;
+                } else if (content.right < viewport.right) {
+                    dx = viewport.right - content.right;
+                }
+                if (content.height <= viewport.height) {
+                    dy = (viewport.top + viewport.height / 2) - (content.top + content.height / 2);
+                } else if (content.top > viewport.top) {
+                    dy = viewport.top - content.top;
+                } else if (content.bottom < viewport.bottom) {
+                    dy = viewport.bottom - content.bottom;
+                }
+                state.panX += dx;
+                state.panY += dy;
+            };
+
             const applyTransform = () => {
+                elements.pagesContainer.style.transformOrigin = 'top left';
+                elements.pagesContainer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`;
+                clampPan();
                 elements.pagesContainer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`;
                 elements.btnZoomReset.textContent = `${Math.round(state.zoomLevel * 100)}%`;
             };
 
             const minZoom = () => state.allPagesLayout === 'none' ? 0.5 : 1;
             const setZoom = (newZoom) => {
-                state.zoomLevel = Math.max(minZoom(), Math.min(3.5, newZoom));
-                // En vista continua no reiniciar el desplazamiento al llegar al tamaño mínimo:
-                // hacerlo llevaba la lectura al principio de la tira de páginas.
-                if (state.zoomLevel === 1 && state.allPagesLayout === 'none') {
-                    state.panX = 0;
-                    state.panY = 0;
-                }
+                const oldZoom = state.zoomLevel;
+                const nextZoom = Math.max(minZoom(), Math.min(3.5, newZoom));
+                if (nextZoom === oldZoom) return;
+                // Mantiene el punto central del visor fijo: el zoom no empuja las páginas a la derecha.
+                const viewport = elements.canvasWrapper.getBoundingClientRect();
+                const centerX = viewport.left + viewport.width / 2;
+                const centerY = viewport.top + viewport.height / 2;
+                const before = elements.pagesContainer.getBoundingClientRect();
+                const localX = (centerX - before.left) / oldZoom;
+                const localY = (centerY - before.top) / oldZoom;
+                state.zoomLevel = nextZoom;
+                elements.pagesContainer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`;
+                const after = elements.pagesContainer.getBoundingClientRect();
+                state.panX += centerX - (after.left + localX * nextZoom);
+                state.panY += centerY - (after.top + localY * nextZoom);
                 applyTransform();
             };
 
