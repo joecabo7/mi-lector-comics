@@ -45,6 +45,13 @@
     #sensibilidad-mouse { width:90px; accent-color:#168cff; }
     #sensibilidad-valor { min-width:22px; text-align:right; }
     #btn-cerrar-comic { background:rgba(220,53,69,.82) !important; }
+    #btn-marcador.activo { background: #b8860b !important; }
+    #paginas-contenedor.modo-doble { display:flex; align-items:center; justify-content:center; gap:3px; overflow:hidden; padding:58px 8px 12px; }
+    #paginas-contenedor.modo-doble .pagina-comic { height:calc(100% - 70px); width:auto; max-width:49%; object-fit:contain; }
+    body.tema-midnight #visor { background:#0b1220; }
+    body.tema-oled #visor { background:#000; }
+    body.tema-sepia #visor { background:#211a14; }
+    #selector-marcadores { max-width:130px; min-width:0; padding:8px 6px; color:#fff; background:rgba(36,36,36,.88); border:1px solid rgba(255,255,255,.25); border-radius:5px; font-size:12px; }
     #btn-cerrar-comic:hover { background:rgba(189,33,48,.94) !important; }
     #paginas-contenedor { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
     #paginas-contenedor img { touch-action: none; }
@@ -100,11 +107,17 @@
         <option value="una">Una página</option>
         <option value="vertical">Varias vertical</option>
         <option value="horizontal">Varias horizontal</option>
+        <option value="doble">Doble página</option>
       </select>
       <select id="modo-ajuste" aria-label="Ajuste de página" title="Ajuste de página">
         <option value="pantalla">Ajustar pantalla</option>
         <option value="ancho">Ajustar ancho</option>
       </select>
+      <button class="btn" type="button" id="btn-direccion" title="Cambiar dirección de lectura">LTR ↔ RTL</button>
+      <button class="btn" type="button" id="btn-marcador" title="Guardar o quitar marcador de esta página">☆ Marcador</button>
+      <select id="selector-marcadores" aria-label="Ir a marcador" title="Páginas guardadas"><option value="">Marcadores</option></select>
+      <select id="selector-tema" aria-label="Tema del lector" title="Tema"><option value="default">Oscuro</option><option value="midnight">Medianoche</option><option value="oled">OLED</option><option value="sepia">Sepia</option></select>
+      <button class="btn" type="button" id="btn-pantalla-completa" title="Pantalla completa">⛶</button>
       <label id="sensibilidad-control" for="sensibilidad-mouse" title="Sensibilidad del movimiento con el cursor">Movimiento <input id="sensibilidad-mouse" type="range" min="1" max="100" value="30"><span id="sensibilidad-valor">30</span></label>
       <button class="btn btn-peligro" type="button" id="btn-cerrar-comic" aria-label="Cerrar cómic" title="Cerrar cómic">✕</button>
     </div>
@@ -139,10 +152,10 @@
     const $ = (id) => document.getElementById(id);
 
     function cargarConfigVista() {
-      const predeterminada = { modo: 'una', ajuste: 'pantalla', sensibilidad: 30 };
+      const predeterminada = { modo: 'una', ajuste: 'pantalla', sensibilidad: 30, direccion: 'LTR', tema: 'default' };
       try {
         const guardada = JSON.parse(localStorage.getItem('mi_lector_comics_config_vista') || 'null');
-        if (guardada && ['una', 'vertical', 'horizontal'].includes(guardada.modo) &&
+        if (guardada && ['una', 'vertical', 'horizontal', 'doble'].includes(guardada.modo) &&
             ['pantalla', 'ancho'].includes(guardada.ajuste)) return { ...predeterminada, ...guardada, sensibilidad: Math.max(1, Math.min(100, Number(guardada.sensibilidad) || 30)) };
       } catch (_) {}
       return predeterminada;
@@ -157,17 +170,21 @@
       $('sensibilidad-mouse').value = sensibilidadMouse;
       $('sensibilidad-valor').textContent = sensibilidadMouse;
       const cont = $('paginas-contenedor');
-      cont.classList.remove('modo-una', 'modo-multiple-vertical', 'modo-multiple-horizontal', 'ajuste-pantalla', 'ajuste-ancho');
+      cont.classList.remove('modo-una', 'modo-multiple-vertical', 'modo-multiple-horizontal', 'modo-doble', 'ajuste-pantalla', 'ajuste-ancho');
       cont.classList.add(configVista.modo === 'una' ? 'modo-una' :
-        configVista.modo === 'vertical' ? 'modo-multiple-vertical' : 'modo-multiple-horizontal');
+        configVista.modo === 'vertical' ? 'modo-multiple-vertical' : configVista.modo === 'doble' ? 'modo-doble' : 'modo-multiple-horizontal');
       if (configVista.modo === 'una') cont.classList.add(configVista.ajuste === 'ancho' ? 'ajuste-ancho' : 'ajuste-pantalla');
       $('modo-vista').value = configVista.modo;
       $('modo-ajuste').value = configVista.ajuste;
       $('modo-ajuste').disabled = configVista.modo !== 'una';
+      $('btn-direccion').textContent = configVista.direccion === 'RTL' ? 'RTL ←' : 'LTR →';
+      $('selector-tema').value = configVista.tema || 'default';
+      aplicarTema(configVista.tema || 'default');
+      actualizarMarcadores();
       $('sensibilidad-control').style.display = (configVista.modo === 'una' && configVista.ajuste === 'ancho' && window.matchMedia('(min-width: 481px)').matches) ? 'flex' : 'none';
       if (configVista.modo !== 'una' || configVista.ajuste !== 'ancho') centrarImagenPorRaton();
-      $('btn-anterior').style.display = configVista.modo === 'una' ? 'inline-block' : 'none';
-      $('btn-siguiente').style.display = configVista.modo === 'una' ? 'inline-block' : 'none';
+      $('btn-anterior').style.display = ['una','doble'].includes(configVista.modo) ? 'inline-block' : 'none';
+      $('btn-siguiente').style.display = ['una','doble'].includes(configVista.modo) ? 'inline-block' : 'none';
       renderizarVistaComic();
     }
 
@@ -182,11 +199,16 @@
         configurarGestosZoom();
       } else {
         cont.innerHTML = '';
-        paginasComic.forEach((url, i) => {
+        let indices = configVista.modo === 'doble'
+          ? [paginaActual, paginaActual + 1].filter(i => i < paginasComic.length)
+          : paginasComic.map((_, i) => i);
+        if (configVista.direccion === 'RTL' && (configVista.modo === 'doble' || configVista.modo === 'horizontal')) indices.reverse();
+        indices.forEach((i) => {
           const img = document.createElement('img');
           img.className = 'pagina-comic';
-          img.src = url;
+          img.src = paginasComic[i];
           img.alt = `Página ${i + 1}`;
+          img.dataset.pageIndex = String(i);
           img.dataset.zoomScale = '1'; img.dataset.zoomX = '0'; img.dataset.zoomY = '0';
           img.loading = i > 3 ? 'lazy' : 'eager';
           img.addEventListener('dblclick', alternarAjuste);
@@ -194,6 +216,7 @@
         });
         configurarGestosZoom();
       }
+      actualizarMarcadores();
     }
 
     function reiniciarZoom() {
@@ -328,6 +351,22 @@
         centrarImagenPorRaton();
         guardarConfigVista();
         aplicarConfigVista();
+      });
+      $('btn-direccion').addEventListener('click', () => {
+        configVista.direccion = configVista.direccion === 'LTR' ? 'RTL' : 'LTR';
+        guardarConfigVista(); aplicarConfigVista();
+      });
+      $('btn-marcador').addEventListener('click', alternarMarcador);
+      $('selector-marcadores').addEventListener('change', () => {
+        const v = $('selector-marcadores').value;
+        if (v !== '') { paginaActual = Number(v); reiniciarZoom(); mostrarPagina(); renderizarVistaComic(); }
+      });
+      $('selector-tema').addEventListener('change', () => {
+        configVista.tema = $('selector-tema').value; aplicarTema(configVista.tema); guardarConfigVista();
+      });
+      $('btn-pantalla-completa').addEventListener('click', async () => {
+        try { if (!document.fullscreenElement) await $('visor').requestFullscreen(); else await document.exitFullscreen(); }
+        catch (_) { estado('La pantalla completa no está disponible en este navegador.', true); }
       });
       aplicarConfigVista();
       $('btn-buscar').addEventListener('click', buscarComics);
@@ -630,16 +669,18 @@
         cont.scrollLeft = 0;
       }
       $('btn-anterior').disabled = paginaActual === 0;
-      $('btn-siguiente').disabled = paginaActual === paginasComic.length - 1;
+      $('btn-siguiente').disabled = paginaActual >= paginasComic.length - (configVista.modo === 'doble' ? 2 : 1);
     }
 
     function cambiarPagina(direccion) {
       if (!paginasComic.length) return;
-      const nueva = paginaActual + direccion;
+      const paso = configVista.modo === 'doble' ? 2 : 1;
+      const nueva = paginaActual + direccion * paso;
       if (nueva < 0 || nueva >= paginasComic.length) return;
       paginaActual = nueva;
       reiniciarZoom();
-      mostrarPagina();
+      if (configVista.modo === 'una') mostrarPagina(); else renderizarVistaComic();
+      actualizarMarcadores();
     }
 
     function limpiarPaginas() {
@@ -647,6 +688,35 @@
       paginasComic = [];
       const cont = $('paginas-contenedor');
       if (cont) cont.innerHTML = '<img id="comic-img" alt="Página del cómic">';
+    }
+
+    function claveMarcadores() { return 'mi_lector_marcadores_' + nombreComicActual; }
+    function obtenerMarcadores() {
+      try { return JSON.parse(localStorage.getItem(claveMarcadores()) || '[]').filter(n => Number.isInteger(n) && n >= 0 && n < paginasComic.length); }
+      catch (_) { return []; }
+    }
+    function actualizarMarcadores() {
+      const selector = $('selector-marcadores');
+      if (!selector) return;
+      const guardados = obtenerMarcadores();
+      selector.innerHTML = '<option value="">Marcadores</option>';
+      guardados.forEach(i => { const op = document.createElement('option'); op.value = String(i); op.textContent = 'Página ' + (i + 1); selector.appendChild(op); });
+      const activo = guardados.includes(paginaActual);
+      $('btn-marcador').classList.toggle('activo', activo);
+      $('btn-marcador').textContent = activo ? '★ Marcador' : '☆ Marcador';
+    }
+    function alternarMarcador() {
+      if (!paginasComic.length || !nombreComicActual) return;
+      const lista = obtenerMarcadores();
+      const pos = lista.indexOf(paginaActual);
+      if (pos >= 0) { lista.splice(pos, 1); estado('Marcador eliminado.'); }
+      else { lista.push(paginaActual); lista.sort((a,b)=>a-b); estado('Marcador guardado en la página ' + (paginaActual + 1) + '.'); }
+      try { localStorage.setItem(claveMarcadores(), JSON.stringify(lista)); } catch (_) {}
+      actualizarMarcadores();
+    }
+    function aplicarTema(tema) {
+      document.body.classList.remove('tema-midnight','tema-oled','tema-sepia');
+      if (['midnight','oled','sepia'].includes(tema)) document.body.classList.add('tema-' + tema);
     }
 
     function cerrarVisor() {
@@ -687,7 +757,11 @@
 
     document.addEventListener('keydown', (e) => {
       if ($('visor').style.display !== 'block') return;
-      if (e.key === 'Escape') cerrarVisor();
+      if (e.target && ['INPUT','SELECT','TEXTAREA','BUTTON'].includes(e.target.tagName) && e.key !== 'Escape') return;
+      if (e.key === 'Escape') { if (document.fullscreenElement) document.exitFullscreen().catch(()=>{}); else cerrarVisor(); }
+      if (e.key.toLowerCase() === 'b') alternarMarcador();
+      if (e.key.toLowerCase() === 'f') $('btn-pantalla-completa').click();
+      if (e.key.toLowerCase() === 'd') { configVista.modo = configVista.modo === 'doble' ? 'una' : 'doble'; guardarConfigVista(); aplicarConfigVista(); }
       if (configVista.modo === 'una' && (e.key === 'ArrowRight' || e.key === ' ')) {
         e.preventDefault();
         cambiarPagina(1);
