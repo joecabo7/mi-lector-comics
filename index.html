@@ -221,11 +221,6 @@
                             <button class="theme-opt bg-slate-900 border border-slate-700 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="midnight">Midnight</button>
                             <button class="theme-opt bg-black border border-gray-800 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="oled">OLED</button>
                         </div>
-                        <div class="font-semibold text-gray-400 uppercase tracking-wider mb-2 text-[10px]">Disposición de todas las páginas</div>
-                        <div class="flex rounded-lg bg-black/30 p-1 mb-3 gap-1">
-                            <button class="all-pages-opt flex-1 py-1 text-center rounded text-gray-400 hover:text-white transition-colors" data-layout="column">En columna</button>
-                            <button class="all-pages-opt flex-1 py-1 text-center rounded text-gray-400 hover:text-white transition-colors" data-layout="row">En fila</button>
-                        </div>
                         <div class="font-semibold text-gray-400 uppercase tracking-wider mb-2 text-[10px]">Ajuste de página</div>
                         <div class="flex rounded-lg bg-black/30 p-1 mb-3">
                             <button class="fit-opt flex-1 py-1 text-center rounded text-gray-400 hover:text-white transition-colors" data-fit="height">Alto</button>
@@ -959,7 +954,6 @@
             pageUrls: [],        // Blob URLs for rendered pages
             currentPage: 0,      // 0-indexed page index
             isDoublePage: false,
-            allPagesLayout: localStorage.getItem('comicvault-all-pages-layout') || 'none',
             readingDirection: 'LTR', // 'LTR' or 'RTL'
             fitMode: 'height',   // 'height', 'width', 'original'
             zoomLevel: 1,        // Scale multiplier
@@ -1146,18 +1140,16 @@
         async function renderCurrentView() {
             if (state.pageFiles.length === 0) return;
 
-            // El zoom y el desplazamiento se aplican al contenedor completo: en modo continuo
-            // todas las páginas se comportan como una sola superficie.
+            // Vista normal: una página o dos páginas, según la configuración.
             elements.pagesContainer.innerHTML = '';
-            const allPages = state.allPagesLayout === 'column' || state.allPagesLayout === 'row';
             elements.pagesContainer.style.display = 'flex';
-            elements.pagesContainer.style.flexDirection = state.allPagesLayout === 'row' ? 'row' : 'column';
+            elements.pagesContainer.style.flexDirection = 'row';
             elements.pagesContainer.style.alignItems = 'center';
-            elements.pagesContainer.style.justifyContent = 'flex-start';
-            elements.pagesContainer.style.gap = allPages ? '8px' : '4px';
-            elements.pagesContainer.style.width = allPages ? 'max-content' : '';
-            const isDouble = !allPages && state.isDoublePage && (state.currentPage < state.pageFiles.length - 1);
-            const pageIndices = allPages ? Array.from({length: state.pageFiles.length}, (_, i) => i) : (isDouble ? [state.currentPage, state.currentPage + 1] : [state.currentPage]);
+            elements.pagesContainer.style.justifyContent = 'center';
+            elements.pagesContainer.style.gap = '4px';
+            elements.pagesContainer.style.width = '';
+            const isDouble = state.isDoublePage && (state.currentPage < state.pageFiles.length - 1);
+            const pageIndices = isDouble ? [state.currentPage, state.currentPage + 1] : [state.currentPage];
 
             if (state.readingDirection === 'RTL') {
                 pageIndices.reverse();
@@ -1173,23 +1165,7 @@
                 img.className = 'select-none rounded shadow-2xl object-contain transition-all duration-200';
                 
                 // Fit mode styling
-                if (allPages) {
-                    img.style.flex = '0 0 auto';
-                    if (state.allPagesLayout === 'column') {
-                        // En columnas, el tamaño mínimo corresponde al ancho disponible.
-                        const fitWidth = Math.min(elements.canvasWrapper.clientWidth || window.innerWidth, 900);
-                        img.style.width = fitWidth + 'px';
-                        img.style.maxWidth = fitWidth + 'px';
-                        img.style.height = 'auto';
-                        img.style.maxHeight = 'none';
-                    } else {
-                        // En filas, el tamaño mínimo corresponde a la altura visible de una página.
-                        img.style.width = 'auto';
-                        img.style.maxWidth = 'none';
-                        img.style.height = 'calc(100vh - 7rem)';
-                        img.style.maxHeight = 'calc(100vh - 7rem)';
-                    }
-                } else if (state.fitMode === 'height') {
+                if (state.fitMode === 'height') {
                     img.style.maxHeight = 'calc(100vh - 7rem)';
                     img.style.width = 'auto';
                 } else if (state.fitMode === 'width') {
@@ -1369,61 +1345,24 @@
          * Pan and Zoom Engine
          */
         function setupZoomAndPan() {
-            // Limita el desplazamiento al área del visor. Si el contenido es menor
-            // que el visor, lo centra; si es mayor, impide dejar bordes vacíos.
+            // Limita el desplazamiento al área del visor y mantiene la imagen accesible.
             const clampPan = () => {
                 const viewport = elements.canvasWrapper.getBoundingClientRect();
                 const content = elements.pagesContainer.getBoundingClientRect();
-                const layout = state.allPagesLayout;
                 let dx = 0, dy = 0;
-
-                // En vista continua solo se desplaza por el eje de lectura:
-                // columna = vertical; fila = horizontal. El otro eje se mantiene centrado.
-                if (layout === 'column') {
-                    if (content.width <= viewport.width) {
-                        dx = (viewport.left + viewport.width / 2) - (content.left + content.width / 2);
-                    } else if (content.left > viewport.left) {
-                        dx = viewport.left - content.left;
-                    } else if (content.right < viewport.right) {
-                        dx = viewport.right - content.right;
-                    }
-                    if (content.height <= viewport.height) {
-                        dy = (viewport.top + viewport.height / 2) - (content.top + content.height / 2);
-                    } else if (content.top > viewport.top) {
-                        dy = viewport.top - content.top;
-                    } else if (content.bottom < viewport.bottom) {
-                        dy = viewport.bottom - content.bottom;
-                    }
-                } else if (layout === 'row') {
-                    if (content.width <= viewport.width) {
-                        dx = (viewport.left + viewport.width / 2) - (content.left + content.width / 2);
-                    } else if (content.left > viewport.left) {
-                        dx = viewport.left - content.left;
-                    } else if (content.right < viewport.right) {
-                        dx = viewport.right - content.right;
-                    }
-                    if (content.height <= viewport.height) {
-                        dy = (viewport.top + viewport.height / 2) - (content.top + content.height / 2);
-                    } else if (content.top > viewport.top) {
-                        dy = viewport.top - content.top;
-                    } else if (content.bottom < viewport.bottom) {
-                        dy = viewport.bottom - content.bottom;
-                    }
-                } else {
-                    if (content.width <= viewport.width) {
-                        dx = (viewport.left + viewport.width / 2) - (content.left + content.width / 2);
-                    } else if (content.left > viewport.left) {
-                        dx = viewport.left - content.left;
-                    } else if (content.right < viewport.right) {
-                        dx = viewport.right - content.right;
-                    }
-                    if (content.height <= viewport.height) {
-                        dy = (viewport.top + viewport.height / 2) - (content.top + content.height / 2);
-                    } else if (content.top > viewport.top) {
-                        dy = viewport.top - content.top;
-                    } else if (content.bottom < viewport.bottom) {
-                        dy = viewport.bottom - content.bottom;
-                    }
+                if (content.width <= viewport.width) {
+                    dx = (viewport.left + viewport.width / 2) - (content.left + content.width / 2);
+                } else if (content.left > viewport.left) {
+                    dx = viewport.left - content.left;
+                } else if (content.right < viewport.right) {
+                    dx = viewport.right - content.right;
+                }
+                if (content.height <= viewport.height) {
+                    dy = (viewport.top + viewport.height / 2) - (content.top + content.height / 2);
+                } else if (content.top > viewport.top) {
+                    dy = viewport.top - content.top;
+                } else if (content.bottom < viewport.bottom) {
+                    dy = viewport.bottom - content.bottom;
                 }
                 state.panX += dx;
                 state.panY += dy;
@@ -1437,7 +1376,7 @@
                 elements.btnZoomReset.textContent = `${Math.round(state.zoomLevel * 100)}%`;
             };
 
-            const minZoom = () => state.allPagesLayout === 'none' ? 0.5 : 1;
+            const minZoom = () => 0.5;
             const setZoom = (newZoom) => {
                 const oldZoom = state.zoomLevel;
                 const nextZoom = Math.max(minZoom(), Math.min(3.5, newZoom));
@@ -1491,7 +1430,7 @@
                     const t = e.touches[0];
                     swipeStartX = swipeLastX = t.clientX; swipeStartY = t.clientY;
                     panTouchId = t.identifier; panTouchX = t.clientX; panTouchY = t.clientY; panLastTime = performance.now();
-                    touchMode = (state.zoomLevel > 1 || state.allPagesLayout !== 'none') ? 'pan' : 'swipe';
+                    touchMode = state.zoomLevel > 1 ? 'pan' : 'swipe';
                 }
             }, {passive:false});
             elements.canvasWrapper.addEventListener('touchmove', (e) => {
@@ -1508,30 +1447,21 @@
                     state.zoomLevel = newZoom;
                     state.panX = currentFocusX - contentX * newZoom;
                     state.panY = currentFocusY - contentY * newZoom;
-                    if (state.allPagesLayout === 'none' && state.zoomLevel <= 0.5) { state.panX=0; state.panY=0; }
+                    if (state.zoomLevel <= 0.5) { state.panX=0; state.panY=0; }
                     applyTransform();
                 } else if (e.touches.length === 1 && panTouchId !== null) {
                     const t = Array.from(e.touches).find(x => x.identifier === panTouchId);
                     if (!t) return;
                     const dx = t.clientX - panTouchX, dy = t.clientY - panTouchY;
-                    if (touchMode === 'pan' || state.zoomLevel > 1 || state.allPagesLayout !== 'none') {
+                    if (touchMode === 'pan' || state.zoomLevel > 1) {
                         e.preventDefault();
                         touchMode = 'pan';
                         const now = performance.now();
                         const elapsed = Math.max(1, now - panLastTime);
                         const speed = Math.hypot(dx, dy) / elapsed;
                         const acceleration = Math.min(4.2, 1 + speed * 0.11);
-                        if (state.allPagesLayout === 'column') {
-                            // En columnas se recorre la tira vertical; evita que un gesto diagonal
-                            // saque el contenido lateralmente del visor.
-                            state.panY += dy * acceleration;
-                        } else if (state.allPagesLayout === 'row') {
-                            // En filas se recorre horizontalmente.
-                            state.panX += dx * acceleration;
-                        } else {
-                            state.panX += dx * acceleration;
-                            state.panY += dy * acceleration;
-                        }
+                        state.panX += dx * acceleration;
+                        state.panY += dy * acceleration;
                         applyTransform();
                         panLastTime = now;
                     }
@@ -1539,7 +1469,7 @@
                 }
             }, {passive:false});
             elements.canvasWrapper.addEventListener('touchend', (e) => {
-                if (touchMode === 'swipe' && state.zoomLevel <= 1 && state.allPagesLayout === 'none' && e.changedTouches.length) {
+                if (touchMode === 'swipe' && state.zoomLevel <= 1 && e.changedTouches.length) {
                     const t = e.changedTouches[0];
                     const dx = t.clientX - swipeStartX, dy = t.clientY - swipeStartY;
                     if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.2) {
@@ -1564,14 +1494,8 @@
 
             window.addEventListener('mousemove', (e) => {
                 if (state.isDragging) {
-                    if (state.allPagesLayout === 'column') {
-                        state.panY = e.clientY - state.startY;
-                    } else if (state.allPagesLayout === 'row') {
-                        state.panX = e.clientX - state.startX;
-                    } else {
-                        state.panX = e.clientX - state.startX;
-                        state.panY = e.clientY - state.startY;
-                    }
+                    state.panX = e.clientX - state.startX;
+                    state.panY = e.clientY - state.startY;
                     applyTransform();
                 }
             });
@@ -1679,57 +1603,6 @@
                     document.body.className = `bg-darkbg text-gray-100 font-sans h-full overflow-hidden select-none theme-${theme}`;
                     showToast('Tema actualizado');
                 });
-            });
-
-            // Disposición continua: todas las páginas comparten un único contenedor transformado.
-            document.querySelectorAll('.all-pages-opt').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const viewport = elements.canvasWrapper.getBoundingClientRect();
-                    const focusX = viewport.left + viewport.width / 2;
-                    const focusY = viewport.top + viewport.height / 2;
-                    let anchor = null;
-                    const currentImages = Array.from(elements.pagesContainer.querySelectorAll('img[data-page-index]'));
-                    if (currentImages.length) {
-                        let img = currentImages.find(im => { const r = im.getBoundingClientRect(); return focusX >= r.left && focusX <= r.right && focusY >= r.top && focusY <= r.bottom; });
-                        if (!img) img = currentImages.reduce((best, im) => {
-                            const r = im.getBoundingClientRect(); const d = Math.hypot((r.left+r.right)/2-focusX, (r.top+r.bottom)/2-focusY);
-                            return !best || d < best.d ? {im, d} : best;
-                        }, null)?.im;
-                        if (img) {
-                            const r = img.getBoundingClientRect();
-                            anchor = { index: Number(img.dataset.pageIndex), rx: r.width ? Math.max(0, Math.min(1, (focusX-r.left)/r.width)) : .5, ry: r.height ? Math.max(0, Math.min(1, (focusY-r.top)/r.height)) : .5, x: focusX, y: focusY };
-                        }
-                    }
-                    const chosen = btn.dataset.layout;
-                    state.allPagesLayout = state.allPagesLayout === chosen ? 'none' : chosen;
-                    if (state.allPagesLayout !== 'none') state.zoomLevel = Math.max(1, state.zoomLevel);
-                    try { localStorage.setItem('comicvault-all-pages-layout', state.allPagesLayout); } catch (_) {}
-                    document.querySelectorAll('.all-pages-opt').forEach(b => {
-                        b.classList.toggle('bg-brand-600', state.allPagesLayout === b.dataset.layout);
-                        b.classList.toggle('text-white', state.allPagesLayout === b.dataset.layout);
-                    });
-                    if (state.allPagesLayout !== 'none') {
-                        state.isDoublePage = false;
-                    }
-                    await renderCurrentView();
-                    if (anchor && state.allPagesLayout !== 'none') {
-                        requestAnimationFrame(() => {
-                            const img = elements.pagesContainer.querySelector(`img[data-page-index="${anchor.index}"]`);
-                            if (!img) return;
-                            const r = img.getBoundingClientRect();
-                            const px = r.left + r.width * anchor.rx;
-                            const py = r.top + r.height * anchor.ry;
-                            state.panX += anchor.x - px;
-                            state.panY += anchor.y - py;
-                            elements.pagesContainer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`;
-                        });
-                    }
-                    showToast(state.allPagesLayout === 'none' ? 'Vista normal activada' : (state.allPagesLayout === 'row' ? 'Todas las páginas en fila' : 'Todas las páginas en columna'));
-                });
-            });
-            document.querySelectorAll('.all-pages-opt').forEach(b => {
-                b.classList.toggle('bg-brand-600', state.allPagesLayout === b.dataset.layout);
-                b.classList.toggle('text-white', state.allPagesLayout === b.dataset.layout);
             });
 
             // Fit Mode Options
