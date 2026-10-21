@@ -15,8 +15,10 @@
     * { box-sizing: border-box; }
     body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 20px; }
     h1 { font-size: clamp(1.45rem, 4vw, 2rem); }
-    .btn { background: #007bff; color: white; border: none; padding: 14px 22px; font-size: 16px; cursor: pointer; border-radius: 5px; margin: 8px 4px; display: inline-block; font-weight: bold; }
-    .btn:hover { background: #0056b3; }
+    .btn { background: rgba(0, 123, 255, .78); color: white; border: 1px solid rgba(255,255,255,.16); padding: 14px 22px; font-size: 16px; cursor: pointer; border-radius: 5px; margin: 8px 4px; display: inline-block; font-weight: bold; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+    .btn:hover { background: rgba(0, 86, 179, .86); }
+    .btn-peligro { background: rgba(220, 53, 69, .78) !important; }
+    .btn-peligro:hover { background: rgba(189, 33, 48, .88) !important; }
     .btn:disabled { opacity: .55; cursor: wait; }
     #lista-comics { list-style: none; padding: 0; max-width: 700px; margin: 20px auto; text-align: left; }
     #lista-comics li { background: #1e1e1e; padding: 12px; margin: 6px 0; cursor: pointer; border-radius: 5px; border: 1px solid #333; display: flex; gap: 12px; justify-content: space-between; align-items: center; overflow-wrap: anywhere; }
@@ -26,9 +28,12 @@
     #buscador { flex: 1; min-width: 0; padding: 13px 14px; border-radius: 5px; border: 1px solid #555; background: #202020; color: white; font-size: 16px; }
     #btn-buscar { margin: 0; }
     #visor { display: none; position: fixed; inset: 0; z-index: 1000; background: #000; width: 100%; height: 100%; height: 100dvh; margin: 0; padding: 0; overflow: hidden; }
-    .visor-barra { position: absolute; z-index: 3; top: max(8px, env(safe-area-inset-top)); left: 8px; right: 8px; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+    .visor-barra { position: fixed; z-index: 1002; top: max(8px, env(safe-area-inset-top)); left: 8px; right: 8px; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; pointer-events: none; }
     .visor-barra > * { pointer-events: auto; }
-    .visor-barra .btn { margin: 0; padding: 9px 11px; font-size: 14px; box-shadow: 0 2px 10px #0008; }
+    .visor-barra .btn { margin: 0; padding: 9px 11px; font-size: 14px; box-shadow: 0 2px 10px #0008; flex-shrink: 0; }
+    .visor-barra select { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+    #comic-img { transform-origin: 0 0; touch-action: none; }
+    #paginas-contenedor.zoom-activo { overflow: hidden; }
     .visor-barra select { max-width: 175px; min-width: 0; padding: 9px 7px; color: #fff; background: #242424; border: 1px solid #666; border-radius: 5px; font-size: 14px; }
     #paginas-contenedor { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y pinch-zoom; }
     #paginas-contenedor.modo-una { display: flex; justify-content: center; align-items: flex-start; }
@@ -60,7 +65,7 @@
   <p>Explora tus archivos CBZ de Google Drive desde el PC o el celular.</p>
 
   <button class="btn" id="btn-conectar" type="button">🔐 Conectar con Google Drive</button>
-  <button class="btn" id="btn-salir" type="button" style="display:none;background:#dc3545;">✖ Cerrar sesión</button>
+  <button class="btn" id="btn-salir" type="button" class="btn-peligro" style="display:none;">✖ Cerrar sesión</button>
 
   <div id="estado" role="status" aria-live="polite">Listo para conectar.</div>
 
@@ -87,7 +92,7 @@
         <option value="pantalla">Ajustar pantalla</option>
         <option value="ancho">Ajustar ancho</option>
       </select>
-      <button class="btn" type="button" id="btn-cerrar-comic" style="background:#dc3545;">✖ Cerrar</button>
+      <button class="btn" type="button" id="btn-cerrar-comic" class="btn-peligro" aria-label="Cerrar cómic" title="Cerrar cómic">✕</button>
     </div>
     <div id="paginas-contenedor" class="modo-una ajuste-pantalla">
       <img id="comic-img" src="" alt="Página del cómic">
@@ -107,6 +112,8 @@
     let nombreComicActual = '';
     const CLAVE_CONFIG_VISTA = 'mi_lector_comics_config_vista';
     let configVista = cargarConfigVista();
+    let escalaZoom = 1, desplazamientoX = 0, desplazamientoY = 0;
+    let gestoZoom = null;
 
     const $ = (id) => document.getElementById(id);
 
@@ -145,6 +152,8 @@
         cont.innerHTML = '<img id="comic-img" alt="Página del cómic">';
         $('comic-img').src = paginasComic[paginaActual];
         $('comic-img').addEventListener('dblclick', alternarAjuste);
+        reiniciarZoom();
+        configurarGestosZoom();
       } else {
         cont.innerHTML = '';
         paginasComic.forEach((url, i) => {
@@ -157,6 +166,77 @@
           cont.appendChild(img);
         });
       }
+    }
+
+    function reiniciarZoom() {
+      escalaZoom = 1;
+      desplazamientoX = 0;
+      desplazamientoY = 0;
+      const img = $('comic-img');
+      const cont = $('paginas-contenedor');
+      if (img) img.style.transform = '';
+      if (cont) cont.classList.remove('zoom-activo');
+      gestoZoom = null;
+    }
+
+    function aplicarZoom() {
+      const img = $('comic-img');
+      const cont = $('paginas-contenedor');
+      if (!img) return;
+      if (escalaZoom <= 1) {
+        reiniciarZoom();
+        return;
+      }
+      cont.classList.add('zoom-activo');
+      img.style.transform = `translate(${desplazamientoX}px, ${desplazamientoY}px) scale(${escalaZoom})`;
+    }
+
+    function configurarGestosZoom() {
+      const cont = $('paginas-contenedor');
+      const img = $('comic-img');
+      if (!cont || !img) return;
+      cont.ontouchstart = (e) => {
+        if (configVista.modo !== 'una') return;
+        if (e.touches.length === 2) {
+          e.preventDefault();
+          const a = e.touches[0], b = e.touches[1];
+          gestoZoom = { tipo: 'pinza', distancia: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY), escala: escalaZoom };
+        } else if (e.touches.length === 1 && escalaZoom > 1) {
+          const t = e.touches[0];
+          gestoZoom = { tipo: 'mover', x: t.clientX, y: t.clientY, dx: desplazamientoX, dy: desplazamientoY };
+        } else if (e.touches.length === 1 && escalaZoom === 1) {
+          const t = e.touches[0];
+          gestoZoom = { tipo: 'scroll', x: t.clientX, y: t.clientY, left: cont.scrollLeft, top: cont.scrollTop };
+        } else {
+          gestoZoom = null;
+        }
+      };
+      cont.ontouchmove = (e) => {
+        if (!gestoZoom || configVista.modo !== 'una') return;
+        if (gestoZoom.tipo === 'pinza' && e.touches.length === 2) {
+          e.preventDefault();
+          const a = e.touches[0], b = e.touches[1];
+          const distancia = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+          escalaZoom = Math.max(1, Math.min(5, gestoZoom.escala * distancia / Math.max(1, gestoZoom.distancia)));
+          if (escalaZoom === 1) { desplazamientoX = 0; desplazamientoY = 0; }
+          aplicarZoom();
+        } else if (gestoZoom.tipo === 'mover' && e.touches.length === 1 && escalaZoom > 1) {
+          e.preventDefault();
+          const t = e.touches[0];
+          desplazamientoX = gestoZoom.dx + t.clientX - gestoZoom.x;
+          desplazamientoY = gestoZoom.dy + t.clientY - gestoZoom.y;
+          aplicarZoom();
+        } else if (gestoZoom.tipo === 'scroll' && e.touches.length === 1 && escalaZoom === 1) {
+          e.preventDefault();
+          const t = e.touches[0];
+          cont.scrollTop = gestoZoom.top + gestoZoom.y - t.clientY;
+          cont.scrollLeft = gestoZoom.left + gestoZoom.x - t.clientX;
+        }
+      };
+      cont.ontouchend = (e) => {
+        if (!e.touches.length) gestoZoom = null;
+      };
+      cont.ondblclick = null;
     }
 
     function alternarAjuste() {
@@ -407,6 +487,7 @@
       const nueva = paginaActual + direccion;
       if (nueva < 0 || nueva >= paginasComic.length) return;
       paginaActual = nueva;
+      reiniciarZoom();
       mostrarPagina();
     }
 
