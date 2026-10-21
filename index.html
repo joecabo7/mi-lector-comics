@@ -1389,7 +1389,7 @@
                     if (touchMode === 'pan' || state.zoomLevel > 1) {
                         e.preventDefault();
                         touchMode = 'pan';
-                        state.panX += dx * 2.5; state.panY += dy * 2.5;
+                        state.panX += dx; state.panY += dy; // Movimiento 1:1 con el dedo para evitar desplazamientos excesivos.
                         applyTransform();
                     }
                     panTouchX = t.clientX; panTouchY = t.clientY; swipeLastX = t.clientX;
