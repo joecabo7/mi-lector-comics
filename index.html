@@ -5,189 +5,58 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi Visor de Cómics Personal</title>
     <link rel="icon" href="data:,">
+    <!-- Cargamos JSZip para descomprimir el CBZ directamente en tu pantalla -->
     <script src="https://cloudflare.com"></script>
     <style>
         body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 20px; }
-        button { background: #555; color: white; border: none; padding: 12px 24px; font-size: 16px; cursor: not-allowed; border-radius: 5px; margin: 10px; }
-        #lista-comics { list-style: none; padding: 0; max-width: 500px; margin: 20px auto; text-align: left; }
-        #lista-comics li { background: #1e1e1e; padding: 10px; margin: 5px 0; cursor: pointer; border-radius: 4px; }
+        .btn { background: #007bff; color: white; border: none; padding: 12px 24px; font-size: 16px; cursor: pointer; border-radius: 5px; margin: 10px; display: inline-block; }
+        .btn:hover { background: #0056b3; }
+        #file-input { display: none; }
         #visor { display: none; margin-top: 20px; }
-        #comic-img { max-width: 100%; max-height: 85vh; display: block; margin: 0 auto; }
-        #consola-pantalla { background: #000; color: #00ff00; padding: 10px; text-align: left; max-width: 600px; margin: 20px auto; font-family: monospace; font-size: 12px; border: 1px solid #333; border-radius: 5px; }
+        #comic-img { max-width: 100%; max-height: 85vh; display: block; margin: 0 auto; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .controles { margin-bottom: 15px; }
+        #estado { color: #00ff00; margin: 15px; font-family: monospace; }
     </style>
 </head>
 <body>
 
-    <h1>📚 Mi Visor de Cómics</h1>
+    <h1>📚 Mi Visor de Cómics Privado</h1>
+    <p>Selecciona un archivo .cbz de tu dispositivo o de tu app de Google Drive.</p>
     
-    <!-- Botón con estado inicial de carga -->
-    <button id="btn-conectar" onclick="handleAuthClick()">Esperando librerías de Google...</button>
-    <button id="btn-salir" onclick="handleSignoutClick()" style="display: none; background: #dc3545; cursor: pointer;">Cerrar Sesión</button>
+    <!-- Botón para elegir archivo -->
+    <label for="file-input" class="btn">📂 Seleccionar Cómic (.cbz)</label>
+    <input type="file" id="file-input" accept=".cbz,.zip" onchange="procesarArchivo(this.files[0])">
 
-    <!-- Consola visual para ver qué falla en vivo -->
-    <div id="consola-pantalla">
-        <div>[Sistema] Iniciando visor...</div>
-    </div>
+    <div id="estado"></div>
 
-    <ul id="lista-comics"></ul>
-
+    <!-- Visor de imágenes -->
     <div id="visor">
-        <button onclick="cambiarPagina(-1)" style="background:#007bff; cursor:pointer;">◀ Anterior</button>
-        <button onclick="cerrarVisor()" style="background:#6c757d; cursor:pointer;">✖ Cerrar</button>
-        <button onclick="cambiarPagina(1)" style="background:#007bff; cursor:pointer;">Siguiente ▶</button>
+        <div class="controles">
+            <button class="btn" onclick="cambiarPagina(-1)" style="background:#333;">◀ Anterior</button>
+            <button class="btn" onclick="cerrarVisor()" style="background:#dc3545;">✖ Cerrar</button>
+            <button class="btn" onclick="cambiarPagina(1)" style="background:#333;">Siguiente ▶</button>
+        </div>
         <p>Página: <span id="num-pagina">0</span> / <span id="total-paginas">0</span></p>
         <img id="comic-img" src="" alt="Cargando página...">
     </div>
 
-    <!-- Scripts de Google -->
-    <script src="https://google.com" onload="gapiLoaded()"></script>
-    <script src="https://google.com" onload="gisLoaded()"></script>
-
     <script>
-        // PAGA TUS LLAVES AQUÍ (Asegúrate de quitar espacios)
-        const CLIENT_ID = 'TU_CLIENT_ID_AQUÍ';
-        const API_KEY = 'TU_API_KEY_AQUÍ';
-        
-        const SCOPES = 'https://googleapis.com';
-        const DISCOVERY_DOC = 'https://googleapis.com';
-
-        let tokenClient;
-        let gapiInited = false;
-        let gisnited = false;
         let paginasComic = [];
         let paginaActual = 0;
 
-        function logPantalla(msg, esError = false) {
-            const con = document.getElementById('consola-pantalla');
-            const div = document.createElement('div');
-            div.style.color = esError ? '#ff0000' : '#00ff00';
-            div.innerText = msg;
-            con.appendChild(div);
-            console.log(msg);
-        }
-
-        function gapiLoaded() { 
-            logPantalla("[Google] Script GAPI descargado correctamente.");
-            gapi.load('client', intializeGapiClient); 
-        }
-        
-        async function intializeGapiClient() {
-            try {
-                await gapi.client.init({ apiKey: API_KEY, discoveryDocs: [DISCOVERY_DOC] });
-                gapiInited = true;
-                logPantalla("[Google] API de Google Drive inicializada con éxito.");
-                controlarBotones();
-            } catch (err) {
-                logPantalla("[ERROR GAPI] Falla al inicializar con tu API_KEY. Revisa que sea la correcta. Detalle: " + JSON.stringify(err), true);
-            }
-        }
-
-        function gisLoaded() {
-            try {
-                logPantalla("[Google] Script GIS de autenticación descargado.");
-                tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: CLIENT_ID,
-                    scope: SCOPES,
-                    callback: '', 
-                });
-                gisnited = true;
-                logPantalla("[Google] Cliente de Autenticación creado con éxito.");
-                controlarBotones();
-            } catch (err) {
-                logPantalla("[ERROR GIS] Falla con tu CLIENT_ID. Asegúrate de que termine en .apps.googleusercontent.com. Detalle: " + err.message, true);
-            }
-        }
-
-        function controlarBotones() {
-            if (gapiInited && gisnited) {
-                const btn = document.getElementById('btn-conectar');
-                btn.disabled = false;
-                btn.innerText = "Conectar a Google Drive";
-                btn.style.background = "#007bff";
-                btn.style.cursor = "pointer";
-                logPantalla("[Sistema] ¡Todo listo! El botón ya está activo para conectar.");
-            }
-        }
-
-        function handleAuthClick() {
-            logPantalla("[Sistema] Abriendo ventana de inicio de sesión de Google...");
-            tokenClient.callback = async (resp) => {
-                if (resp.error !== undefined) {
-                    logPantalla("[ERROR OAUTH] El usuario canceló o Google denegó el acceso: " + resp.error, true);
-                    throw (resp);
-                }
-                logPantalla("[Sistema] Autenticación exitosa. Buscando cómics...");
-                document.getElementById('btn-conectar').style.display = 'none';
-                document.getElementById('btn-salir').style.display = 'inline-block';
-                buscarComics();
-            };
-            if (gapi.client.getToken() === null) {
-                tokenClient.requestAccessToken({prompt: 'consent'});
-            } else {
-                tokenClient.requestAccessToken({prompt: ''});
-            }
-        }
-
-        function handleSignoutClick() {
-            const token = gapi.client.getToken();
-            if (token !== null) {
-                google.accounts.oauth2.revoke(token.access_token);
-                gapi.client.setToken(null);
-                document.getElementById('lista-comics').innerHTML = '';
-                cerrarVisor();
-                document.getElementById('btn-conectar').style.display = 'inline-block';
-                document.getElementById('btn-salir').style.display = 'none';
-                logPantalla("[Sistema] Sesión cerrada.");
-            }
-        }
-
-        async function buscarComics() {
-            try {
-                const response = await gapi.client.drive.files.list({
-                    q: "name contains '.cbz' and trashed = false",
-                    fields: 'files(id, name)',
-                });
-                const files = response.result.files;
-                const lista = document.getElementById('lista-comics');
-                lista.innerHTML = '';
-                
-                if (!files || files.length === 0) {
-                    logPantalla("[Drive] Conectado, pero no se encontraron archivos .cbz en tu cuenta.");
-                    lista.innerHTML = '<li>No se encontraron archivos CBZ.</li>';
-                    return;
-                }
-
-                logPantalla("[Drive] ¡Se encontraron " + files.length + " cómics!");
-                files.forEach(file => {
-                    const li = document.createElement('li');
-                    li.textContent = file.name;
-                    li.style.cursor = "pointer";
-                    li.onclick = () => descargarYProcesarCBZ(file.id);
-                    lista.appendChild(li);
-                });
-            } catch (err) {
-                logPantalla("[ERROR DRIVE] No se pudieron listar los archivos: " + JSON.stringify(err), true);
-            }
-        }
-
-        async function descargarYProcesarCBZ(fileId) {
-            document.getElementById('lista-comics').style.display = 'none';
-            logPantalla("[Visor] Descargando archivo desde Drive...");
+        async function procesarArchivo(file) {
+            if (!file) return;
+            
+            const estado = document.getElementById('estado');
+            estado.innerText = "[Procesando] Leyendo el archivo... por favor espera.";
+            document.getElementById('visor').style.display = 'none';
 
             try {
-                const response = await gapi.client.drive.files.get({ fileId: fileId, alt: 'media' });
-                const str = response.body;
-                const buf = new ArrayBuffer(str.length);
-                const bufView = new Uint8Array(buf);
-                for (let i = 0, strLen = str.length; i < strLen; i++) {
-                    bufView[i] = str.charCodeAt(i);
-                }
-
-                logPantalla("[Visor] Descomprimiendo archivo binario con JSZip...");
-                const zip = await JSZip.loadAsync(buf);
+                // JSZip lee el archivo que seleccionó el usuario directamente
+                const zip = await JSZip.loadAsync(file);
                 paginasComic = [];
-
                 const promesasArchivos = [];
+
                 zip.forEach((relativePath, zipEntry) => {
                     if (!zipEntry.dir && /\.(jfif|jpeg|jpg|png|webp)$/i.test(zipEntry.name)) {
                         promesasArchivos.push(
@@ -199,6 +68,8 @@
                 });
 
                 const imagenes = await Promise.all(promesasArchivos);
+                
+                // Ordenar las páginas alfabéticamente/numéricamente
                 imagenes.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'}));
                 
                 paginasComic = imagenes.map(img => img.url);
@@ -207,31 +78,40 @@
                     paginaActual = 0;
                     mostrarPagina();
                     document.getElementById('visor').style.display = 'block';
-                    logPantalla("[Visor] Cómic abierto. ¡A leer!");
+                    estado.innerText = "[Listo] ¡Cómic cargado con éxito!";
                 } else {
-                    logPantalla("[ERROR VISOR] El archivo .cbz está vacío o no contiene imágenes válidas.", true);
-                    cerrarVisor();
-}
-} catch (err) {
-logPantalla("[ERROR VISOR] Falló la descarga o descompresión: " + JSON.stringify(err), true);
-cerrarVisor();
-}
-}
-function mostrarPagina() {
-document.getElementById('comic-img').src = paginasComic[paginaActual];
-document.getElementById('num-pagina').textContent = paginaActual + 1;
-document.getElementById('total-paginas').textContent = paginasComic.length;
-window.scrollTo(0,0);
-}
-function cambiarPagina(direccion) {
-paginaActual += direccion;
-if (paginaActual < 0) paginaActual = 0;
-if (paginaActual >= paginasComic.length) paginaActual = paginasComic.length - 1;
-mostrarPagina();
-}
-function cerrarVisor() {
-document.getElementById('visor').style.display = 'none';
-document.getElementById('lista-comics').style.display = 'block';
-paginasComic.forEach(url => URL.revokeObjectURL(url));
-paginasComic = [];
-}
+                    estado.style.color = "#ff0000";
+                    estado.innerText = "[Error] El archivo no contiene imágenes válidas (.jpg, .png, .webp).";
+                }
+
+            } catch (err) {
+                console.error(err);
+                estado.style.color = "#ff0000";
+                estado.innerText = "[Error] No se pudo procesar el archivo comprimido.";
+            }
+        }
+
+        function mostrarPagina() {
+            document.getElementById('comic-img').src = paginasComic[paginaActual];
+            document.getElementById('num-pagina').textContent = paginaActual + 1;
+            document.getElementById('total-paginas').textContent = paginasComic.length;
+            window.scrollTo(0,0);
+        }
+
+        function cambiarPagina(direccion) {
+            paginaActual += direccion;
+            if (paginaActual < 0) paginaActual = 0;
+            if (paginaActual >= paginasComic.length) paginaActual = paginasComic.length - 1;
+            mostrarPagina();
+        }
+
+        function cerrarVisor() {
+            document.getElementById('visor').style.display = 'none';
+            document.getElementById('estado').innerText = "";
+            paginasComic.forEach(url => URL.revokeObjectURL(url));
+            paginasComic = [];
+            document.getElementById('file-input').value = "";
+        }
+    </script>
+</body>
+</html>
