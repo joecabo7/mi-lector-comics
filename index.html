@@ -5,27 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi Visor de Cómics Personal</title>
     <link rel="icon" href="data:,">
-    <!-- Cargamos JSZip para descomprimir el CBZ directamente en tu pantalla -->
     <script src="https://cloudflare.com"></script>
     <style>
         body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 20px; }
-        .btn { background: #007bff; color: white; border: none; padding: 12px 24px; font-size: 16px; cursor: pointer; border-radius: 5px; margin: 10px; display: inline-block; }
+        .btn { background: #007bff; color: white; border: none; padding: 14px 28px; font-size: 16px; cursor: pointer; border-radius: 5px; margin: 10px; display: inline-block; font-weight: bold; }
         .btn:hover { background: #0056b3; }
-        #file-input { display: none; }
         #visor { display: none; margin-top: 20px; }
-        #comic-img { max-width: 100%; max-height: 85vh; display: block; margin: 0 auto; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        .controles { margin-bottom: 15px; }
-        #estado { color: #00ff00; margin: 15px; font-family: monospace; }
+        #comic-img { max-width: 100%; max-height: 85vh; display: block; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.7); }
+        #estado { color: #00ff00; margin: 15px; font-family: monospace; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <h1>📚 Mi Visor de Cómics Privado</h1>
-    <p>Selecciona un archivo .cbz de tu dispositivo o de tu app de Google Drive.</p>
+    <h1>📚 Mi Visor de Cómics de Google Drive</h1>
+    <p>Haz clic abajo para explorar tus carpetas de Drive de forma directa.</p>
     
-    <!-- Botón para elegir archivo -->
-    <label for="file-input" class="btn">📂 Seleccionar Cómic (.cbz)</label>
-    <input type="file" id="file-input" accept=".cbz,.zip" onchange="procesarArchivo(this.files[0])">
+    <button class="btn" id="btn-explorar" onclick="autenticarYExplorar()">🌐 Ver mis archivos en Google Drive</button>
 
     <div id="estado"></div>
 
@@ -33,61 +28,129 @@
     <div id="visor">
         <div class="controles">
             <button class="btn" onclick="cambiarPagina(-1)" style="background:#333;">◀ Anterior</button>
-            <button class="btn" onclick="cerrarVisor()" style="background:#dc3545;">✖ Cerrar</button>
+            <button class="btn" onclick="cerrarVisor()" style="background:#dc3545;">✖ Cerrar Comic</button>
             <button class="btn" onclick="cambiarPagina(1)" style="background:#333;">Siguiente ▶</button>
         </div>
-        <p>Página: <span id="num-pagina">0</span> / <span id="total-paginas">0</span></p>
+        <p>Página: <b id="num-pagina">0</b> / <span id="total-paginas">0</span></p>
         <img id="comic-img" src="" alt="Cargando página...">
     </div>
 
+    <!-- Carga moderna de librerías oficiales de Google -->
+    <script src="https://google.com"></script>
+    <script src="https://google.com"></script>
+
     <script>
+        // PEGA TUS CREDENCIALES AQUÍ
+        const CLIENT_ID = '159354537005-ctmmipo3d8b2gs25l1e9rkkruertveb0.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyCpEbJlI4mVv6ZtUDA2Xqx8k1403U28qiA';
+        
+        // El App ID es el número largo de tu proyecto (lo ves arriba en la consola de Google Cloud)
+        const APP_ID = '159354537005'; 
+
+        const SCOPES = 'https://googleapis.com';
+        let accessToken = null;
         let paginasComic = [];
         let paginaActual = 0;
 
-        async function procesarArchivo(file) {
-            if (!file) return;
-            
+        // Listener para teclado en PC
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('visor').style.display === 'block') {
+                if (e.key === 'ArrowRight' || e.key === ' ') cambiarPagina(1);
+                if (e.key === 'ArrowLeft') cambiarPagina(-1);
+                if (e.key === 'Escape') cerrarVisor();
+            }
+        });
+
+        function autenticarYExplorar() {
             const estado = document.getElementById('estado');
-            estado.innerText = "[Procesando] Leyendo el archivo... por favor espera.";
-            document.getElementById('visor').style.display = 'none';
-
-            try {
-                // JSZip lee el archivo que seleccionó el usuario directamente
-                const zip = await JSZip.loadAsync(file);
-                paginasComic = [];
-                const promesasArchivos = [];
-
-                zip.forEach((relativePath, zipEntry) => {
-                    if (!zipEntry.dir && /\.(jfif|jpeg|jpg|png|webp)$/i.test(zipEntry.name)) {
-                        promesasArchivos.push(
-                            zipEntry.async("blob").then(blob => {
-                                return { name: zipEntry.name, url: URL.createObjectURL(blob) };
-                            })
-                        );
+            estado.innerText = "[Conectando] Abriendo autenticación...";
+            
+            const client = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (response) => {
+                    if (response.error) {
+                        estado.innerText = "[Error] Acceso denegado.";
+                        return;
                     }
-                });
-
-                const imagenes = await Promise.all(promesasArchivos);
-                
-                // Ordenar las páginas alfabéticamente/numéricamente
-                imagenes.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'}));
-                
-                paginasComic = imagenes.map(img => img.url);
-                
-                if(paginasComic.length > 0) {
-                    paginaActual = 0;
-                    mostrarPagina();
-                    document.getElementById('visor').style.display = 'block';
-                    estado.innerText = "[Listo] ¡Cómic cargado con éxito!";
-                } else {
-                    estado.style.color = "#ff0000";
-                    estado.innerText = "[Error] El archivo no contiene imágenes válidas (.jpg, .png, .webp).";
+                    accessToken = response.access_token;
+                    estado.innerText = "[Conectado] Cargando tus carpetas de Drive...";
+                    gapi.load('picker', iniciarExploradorDrive);
                 }
+            });
+            client.requestAccessToken();
+        }
 
-            } catch (err) {
-                console.error(err);
-                estado.style.color = "#ff0000";
-                estado.innerText = "[Error] No se pudo procesar el archivo comprimido.";
+        function iniciarExploradorDrive() {
+            // Crear el explorador visual de archivos (Picker) filtrando para ver carpetas y archivos .cbz/.zip
+            const vistaDrive = new google.picker.View(google.picker.ViewId.DOCS);
+            
+            const picker = new google.picker.PickerBuilder()
+                .enableFeature(google.picker.Feature.NAV_HIDDEN)
+                .setDeveloperKey(API_KEY)
+                .setAppId(APP_ID)
+                .setOAuthToken(accessToken)
+                .addView(vistaDrive)
+                .setCallback(archivoSeleccionadoCallback)
+                .setTitle("Selecciona tu cómic (.cbz)")
+                .build();
+                
+            picker.setVisible(true);
+        }
+
+        async function archivoSeleccionadoCallback(data) {
+            const estado = document.getElementById('estado');
+            if (data.action === google.picker.Action.PICKED) {
+                const fileId = data.docs[0].id;
+                const fileName = data.docs[0].name;
+                
+                estado.innerText = `[Descargando] Abriendo "${fileName}" desde tu Drive...`;
+                document.getElementById('visor').style.display = 'none';
+
+                try {
+                    // Descargar los datos binarios del archivo usando el Token de acceso seguro
+                    const url = `https://googleapis.com{fileId}?alt=media`;
+                    const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    
+                    if (!res.ok) throw new Error("Falla al descargar");
+                    const blob = await res.blob();
+                    
+                    // Procesar con JSZip
+                    const zip = await JSZip.loadAsync(blob);
+                    paginasComic = [];
+                    const promesasArchivos = [];
+
+                    zip.forEach((relativePath, zipEntry) => {
+                        if (!zipEntry.dir && /\.(jfif|jpeg|jpg|png|webp)\$/i.test(zipEntry.name)) {
+                            promesasArchivos.push(
+                                zipEntry.async("blob").then(blobComic => {
+                                    return { name: zipEntry.name, url: URL.createObjectURL(blobComic) };
+                                })
+                            );
+                        }
+                    });
+
+                    const imagenes = await Promise.all(promesasArchivos);
+                    imagenes.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'}));
+                    
+                    paginasComic = imagenes.map(img => img.url);
+                    
+                    if(paginasComic.length > 0) {
+                        paginaActual = 0;
+                        mostrarPagina();
+                        document.getElementById('visor').style.display = 'block';
+                        estado.innerText = `[Leyendo] ${fileName}. ¡Usa las flechas del teclado!`;
+                    } else {
+                        estado.innerText = "[Error] El archivo elegido no tiene imágenes legibles dentro.";
+                    }
+                } catch (err) {
+                    console.error(err);
+                    estado.innerText = "[Error] No se pudo descargar el cómic. Verifica los permisos.";
+                }
+            } else if (data.action === google.picker.Action.CANCEL) {
+                estado.innerText = "[Cancelado] No seleccionaste ningún archivo.";
             }
         }
 
@@ -110,7 +173,6 @@
             document.getElementById('estado').innerText = "";
             paginasComic.forEach(url => URL.revokeObjectURL(url));
             paginasComic = [];
-            document.getElementById('file-input').value = "";
         }
     </script>
 </body>
