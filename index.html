@@ -78,15 +78,17 @@
             }
         });
 
-        function iniciarAutenticacion() {
-            const urlAuth = 'https://google.com?' +
-                           'client_id=' + CLIENT_ID +
-                           '&redirect_uri=' + encodeURIComponent(REDIRECT_URI) +
-                           '&response_type=token' +
-                           '&scope=' + encodeURIComponent(SCOPES) +
-                           '&prompt=consent';
-            window.location.href = urlAuth;
-        }
+        // REEMPLAZA TU FUNCIÓN ACTUAL POR ESTA:
+function iniciarAutenticacion() {
+    const urlAuth = `https://google.com?` +
+                   `client_id=${CLIENT_ID}` +
+                   `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+                   `&response_type=token` +
+                   `&scope=${encodeURIComponent(SCOPES)}` +
+                   `&prompt=consent`;
+    window.location.href = urlAuth;
+}
+
 
         async function listarArchivosDrive() {
             const estado = document.getElementById('estado');
