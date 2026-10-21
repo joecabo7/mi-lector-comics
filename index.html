@@ -955,7 +955,7 @@
             currentPage: 0,      // 0-indexed page index
             isDoublePage: false,
             readingDirection: 'LTR', // 'LTR' or 'RTL'
-            fitMode: 'height',   // 'height', 'width', 'original'
+            fitMode: 'width',    // 'height', 'width', 'original'; ancho como zoom mínimo
             zoomLevel: 1,        // Scale multiplier
             panX: 0,
             panY: 0,
@@ -1147,7 +1147,9 @@
             elements.pagesContainer.style.alignItems = 'center';
             elements.pagesContainer.style.justifyContent = 'center';
             elements.pagesContainer.style.gap = '4px';
-            elements.pagesContainer.style.width = '';
+            elements.pagesContainer.style.width = 'max-content';
+            elements.pagesContainer.style.maxWidth = 'none';
+            elements.pagesContainer.style.maxHeight = 'none';
             const isDouble = state.isDoublePage && (state.currentPage < state.pageFiles.length - 1);
             const pageIndices = isDouble ? [state.currentPage, state.currentPage + 1] : [state.currentPage];
 
@@ -1164,14 +1166,24 @@
                 img.dataset.pageIndex = String(idx);
                 img.className = 'select-none rounded shadow-2xl object-contain transition-all duration-200';
                 
-                // Fit mode styling
+                // Ajustes reales según el área visible del lector.
+                const viewportWidth = Math.max(1, elements.canvasWrapper.clientWidth);
+                const viewportHeight = Math.max(1, elements.canvasWrapper.clientHeight - 8);
+                img.style.flex = '0 0 auto';
+                img.style.maxWidth = 'none';
+                img.style.maxHeight = 'none';
+                img.style.objectFit = 'contain';
+                img.style.transition = 'none';
                 if (state.fitMode === 'height') {
-                    img.style.maxHeight = 'calc(100vh - 7rem)';
+                    img.style.height = `${viewportHeight}px`;
                     img.style.width = 'auto';
                 } else if (state.fitMode === 'width') {
-                    img.style.maxWidth = '100%';
+                    img.style.width = `${Math.max(1, (viewportWidth - (pageIndices.length - 1) * 4) / pageIndices.length)}px`;
                     img.style.height = 'auto';
                 } else {
+                    // Original = tamaño natural de la imagen (100%, sin escala adicional).
+                    img.style.width = 'auto';
+                    img.style.height = 'auto';
                     img.style.maxWidth = 'none';
                     img.style.maxHeight = 'none';
                 }
@@ -1350,12 +1362,11 @@
                 const viewport = elements.canvasWrapper.getBoundingClientRect();
                 const content = elements.pagesContainer.getBoundingClientRect();
                 const zoom = Math.max(0.01, state.zoomLevel);
+                // Medir el tamaño sin transformación evita que los límites acumulen error durante el arrastre.
                 const baseLeft = content.left - state.panX;
                 const baseTop = content.top - state.panY;
-                const baseWidth = content.width / zoom;
-                const baseHeight = content.height / zoom;
-                const scaledWidth = baseWidth * zoom;
-                const scaledHeight = baseHeight * zoom;
+                const scaledWidth = elements.pagesContainer.offsetWidth * zoom;
+                const scaledHeight = elements.pagesContainer.offsetHeight * zoom;
 
                 if (scaledWidth <= viewport.width) {
                     state.panX = viewport.left + (viewport.width - scaledWidth) / 2 - baseLeft;
@@ -1383,7 +1394,7 @@
                 elements.btnZoomReset.textContent = `${Math.round(state.zoomLevel * 100)}%`;
             };
 
-            const minZoom = () => 0.5;
+            const minZoom = () => 1; // El zoom mínimo corresponde al tamaño ajustado al ancho
             const setZoom = (newZoom) => {
                 const oldZoom = state.zoomLevel;
                 const nextZoom = Math.max(minZoom(), Math.min(3.5, newZoom));
@@ -1421,6 +1432,7 @@
             let touchMode = null, panTouchId = null, panTouchX = 0, panTouchY = 0;
             let panLastTime = 0;
             let swipeStartX = 0, swipeStartY = 0, swipeLastX = 0;
+            let touchStartTime = 0, touchMoved = false, lastTapTime = 0;
             elements.canvasWrapper.addEventListener('touchstart', (e) => {
                 if (e.touches.length === 2) {
                     e.preventDefault();
@@ -1436,6 +1448,7 @@
                 } else if (e.touches.length === 1) {
                     const t = e.touches[0];
                     swipeStartX = swipeLastX = t.clientX; swipeStartY = t.clientY;
+                    touchStartTime = performance.now(); touchMoved = false;
                     panTouchId = t.identifier; panTouchX = t.clientX; panTouchY = t.clientY; panLastTime = performance.now();
                     touchMode = state.zoomLevel > 1 ? 'pan' : 'swipe';
                 }
@@ -1454,12 +1467,13 @@
                     state.zoomLevel = newZoom;
                     state.panX = currentFocusX - contentX * newZoom;
                     state.panY = currentFocusY - contentY * newZoom;
-                    if (state.zoomLevel <= 0.5) { state.panX=0; state.panY=0; }
+                    if (state.zoomLevel <= minZoom()) { state.panX=0; state.panY=0; }
                     applyTransform();
                 } else if (e.touches.length === 1 && panTouchId !== null) {
                     const t = Array.from(e.touches).find(x => x.identifier === panTouchId);
                     if (!t) return;
                     const dx = t.clientX - panTouchX, dy = t.clientY - panTouchY;
+                    if (Math.abs(t.clientX - swipeStartX) > 8 || Math.abs(t.clientY - swipeStartY) > 8) touchMoved = true;
                     if (touchMode === 'pan' || state.zoomLevel > 1) {
                         e.preventDefault();
                         touchMode = 'pan';
@@ -1467,22 +1481,51 @@
                         state.panX += dx;
                         state.panY += dy;
                         applyTransform();
-                        panLastTime = now;
+                        panLastTime = performance.now();
                     }
                     panTouchX = t.clientX; panTouchY = t.clientY; swipeLastX = t.clientX;
                 }
             }, {passive:false});
             elements.canvasWrapper.addEventListener('touchend', (e) => {
-                if (touchMode === 'swipe' && state.zoomLevel <= 1 && e.changedTouches.length) {
+                if (e.changedTouches.length && e.touches.length === 0) {
                     const t = e.changedTouches[0];
-                    const dx = t.clientX - swipeStartX, dy = t.clientY - swipeStartY;
-                    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-                        if (dx < 0) nextPage(); else prevPage();
+                    const elapsed = performance.now() - touchStartTime;
+                    const dxTap = Math.abs(t.clientX - swipeStartX), dyTap = Math.abs(t.clientY - swipeStartY);
+                    const isTap = !touchMoved && elapsed < 280 && dxTap < 12 && dyTap < 12;
+                    if (isTap) {
+                        const nowTap = performance.now();
+                        if (nowTap - lastTapTime < 320 && state.zoomLevel > 1) {
+                            // Doble toque durante el zoom: ajustar al ancho disponible.
+                            state.fitMode = 'width';
+                            state.zoomLevel = 1; state.panX = 0; state.panY = 0;
+                            document.querySelectorAll('.fit-opt').forEach(b => {
+                                b.classList.toggle('bg-brand-600', b.dataset.fit === 'width');
+                                b.classList.toggle('text-white', b.dataset.fit === 'width');
+                            });
+                            renderCurrentView();
+                            lastTapTime = 0;
+                        } else lastTapTime = nowTap;
+                    } else if (touchMode === 'swipe' && state.fitMode === 'width' && state.zoomLevel <= minZoom() + 0.001) {
+                        const dx = t.clientX - swipeStartX, dy = t.clientY - swipeStartY;
+                        if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+                            if (dx < 0) nextPage(); else prevPage();
+                        }
+                        lastTapTime = 0;
                     }
                 }
                 if (e.touches.length < 2) pinchStartDistance = 0;
                 if (e.touches.length === 0) { panTouchId = null; touchMode = null; }
             }, {passive:true});
+            elements.canvasWrapper.addEventListener('dblclick', () => {
+                if (state.zoomLevel > 1) {
+                    state.fitMode = 'width'; state.zoomLevel = 1; state.panX = 0; state.panY = 0;
+                    document.querySelectorAll('.fit-opt').forEach(b => {
+                        b.classList.toggle('bg-brand-600', b.dataset.fit === 'width');
+                        b.classList.toggle('text-white', b.dataset.fit === 'width');
+                    });
+                    renderCurrentView();
+                }
+            });
             elements.pagesContainer.addEventListener('click', e => {
                 if (e.target.closest('img')) { elements.sidebar.classList.add('-translate-x-full'); state.sidebarOpen=false; }
             });
@@ -1614,8 +1657,13 @@
             document.querySelectorAll('.fit-opt').forEach(btn => {
                 btn.addEventListener('click', () => {
                     state.fitMode = btn.dataset.fit;
-                    document.querySelectorAll('.fit-opt').forEach(b => b.classList.remove('bg-brand-600', 'text-white'));
-                    btn.classList.add('bg-brand-600', 'text-white');
+                    state.zoomLevel = 1;
+                    state.panX = 0;
+                    state.panY = 0;
+                    document.querySelectorAll('.fit-opt').forEach(b => {
+                        b.classList.toggle('bg-brand-600', b === btn);
+                        b.classList.toggle('text-white', b === btn);
+                    });
                     renderCurrentView();
                 });
             });
