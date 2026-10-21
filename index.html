@@ -21,8 +21,14 @@
     #lista-comics { list-style: none; padding: 0; max-width: 700px; margin: 20px auto; text-align: left; }
     #lista-comics li { background: #1e1e1e; padding: 12px; margin: 6px 0; cursor: pointer; border-radius: 5px; border: 1px solid #333; display: flex; gap: 12px; justify-content: space-between; align-items: center; overflow-wrap: anywhere; }
     #lista-comics li:hover { background: #252525; border-color: #007bff; }
-    #visor { display: none; margin-top: 20px; }
-    #comic-img { max-width: 100%; max-height: 85vh; object-fit: contain; display: block; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.7); }
+    #biblioteca { max-width: 760px; margin: 0 auto; }
+    #buscador-contenedor { display: flex; gap: 8px; max-width: 700px; margin: 16px auto; }
+    #buscador { flex: 1; min-width: 0; padding: 13px 14px; border-radius: 5px; border: 1px solid #555; background: #202020; color: white; font-size: 16px; }
+    #btn-buscar { margin: 0; }
+    #visor { display: none; position: fixed; inset: 0; z-index: 1000; background: #000; width: 100%; height: 100%; height: 100dvh; margin: 0; padding: 0; overflow: hidden; }
+    .visor-barra { position: absolute; z-index: 2; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
+    .visor-barra .btn { margin: 0; padding: 10px 14px; box-shadow: 0 2px 10px #0008; }
+    #comic-img { width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: 0 auto; box-shadow: none; }
     .controles { margin-bottom: 15px; }
     #estado { color: #00ff88; margin: 15px auto; max-width: 900px; font-family: monospace; font-size: 14px; overflow-wrap: anywhere; }
     .ayuda { color: #bbb; font-size: 13px; max-width: 700px; margin: 12px auto; line-height: 1.5; }
@@ -30,6 +36,8 @@
       body { padding: 12px; }
       .btn { padding: 12px 14px; font-size: 15px; }
       #lista-comics li { padding: 11px; }
+      #buscador-contenedor { gap: 6px; }
+      #buscador { padding: 12px 10px; }
     }
   </style>
 </head>
@@ -41,16 +49,21 @@
   <button class="btn" id="btn-salir" type="button" style="display:none;background:#dc3545;">✖ Cerrar sesión</button>
 
   <div id="estado" role="status" aria-live="polite">Listo para conectar.</div>
-  <p class="ayuda">Se solicitará permiso de solo lectura para listar y abrir los archivos de tu Google Drive.</p>
-  <ul id="lista-comics"></ul>
+
+  <section id="biblioteca">
+    <p class="ayuda">Conecta Google Drive y escribe parte del nombre del cómic para buscarlo.</p>
+    <div id="buscador-contenedor">
+      <input id="buscador" type="search" placeholder="Buscar cómic por nombre..." autocomplete="off" aria-label="Buscar cómic por nombre">
+      <button class="btn" id="btn-buscar" type="button">Buscar</button>
+    </div>
+    <p id="resultado-busqueda" class="ayuda" aria-live="polite">Conecta con Google Drive para buscar tus cómics.</p>
+    <ul id="lista-comics"></ul>
+  </section>
 
   <div id="visor">
-    <div class="controles">
-      <button class="btn" type="button" id="btn-anterior" style="background:#333;">◀ Anterior</button>
+    <div class="visor-barra">
       <button class="btn" type="button" id="btn-cerrar-comic" style="background:#dc3545;">✖ Cerrar cómic</button>
-      <button class="btn" type="button" id="btn-siguiente" style="background:#333;">Siguiente ▶</button>
     </div>
-    <p style="font-size:18px;">Página: <b id="num-pagina">0</b> / <span id="total-paginas">0</span></p>
     <img id="comic-img" src="" alt="Página del cómic">
   </div>
 
@@ -78,6 +91,19 @@
       $('btn-anterior').addEventListener('click', () => cambiarPagina(-1));
       $('btn-siguiente').addEventListener('click', () => cambiarPagina(1));
       $('btn-cerrar-comic').addEventListener('click', cerrarVisor);
+      $('btn-buscar').addEventListener('click', buscarComics);
+      $('buscador').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') buscarComics();
+      });
+      $('buscador').addEventListener('input', () => {
+        // Al borrar el texto se vacían resultados anteriores para no confundir.
+        if (!$('buscador').value.trim()) {
+          $('lista-comics').innerHTML = '';
+          $('resultado-busqueda').textContent = accessToken
+            ? 'Escribe el nombre de un cómic y pulsa Buscar.'
+            : 'Conecta con Google Drive para buscar tus cómics.';
+        }
+      });
 
       // Google Identity Services reemplaza el antiguo flujo response_type=token.
       if (!window.google || !google.accounts || !google.accounts.oauth2) {
@@ -102,8 +128,9 @@
           accessToken = response.access_token;
           $('btn-conectar').style.display = 'none';
           $('btn-salir').style.display = 'inline-block';
-          estado('Conectado. Buscando archivos CBZ...');
-          await listarArchivosDrive();
+          estado('Conectado con Google Drive.');
+          $('resultado-busqueda').textContent = 'Escribe el nombre del cómic que quieres encontrar.';
+          $('buscador').focus();
         },
         error_callback: (error) => {
           console.error('Ventana OAuth:', error);
@@ -121,17 +148,26 @@
       tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
     }
 
-    async function listarArchivosDrive() {
+    async function buscarComics() {
+      if (!accessToken) {
+        $('resultado-busqueda').textContent = 'Primero conecta con Google Drive.';
+        return;
+      }
+
+      const termino = $('buscador').value.trim();
       const lista = $('lista-comics');
       lista.innerHTML = '';
-      lista.style.display = 'block';
-      estado('Buscando archivos .cbz en Google Drive...');
 
+      if (!termino) {
+        $('resultado-busqueda').textContent = 'Escribe el nombre o una parte del nombre del cómic.';
+        return;
+      }
+
+      $('btn-buscar').disabled = true;
+      $('resultado-busqueda').textContent = 'Buscando coincidencias en Google Drive...';
       try {
         const encontrados = [];
         let pageToken = null;
-
-        // Sigue la paginación para no limitar la biblioteca a la primera página.
         do {
           const params = new URLSearchParams({
             q: "trashed = false and (name contains '.cbz' or name contains '.CBZ')",
@@ -150,15 +186,19 @@
           pageToken = data.nextPageToken || null;
         } while (pageToken);
 
-        if (encontrados.length === 0) {
-          estado('Conexión correcta, pero no se encontraron archivos .cbz en tu Drive.');
+        // Filtrado local sin distinguir mayúsculas/minúsculas, conservando búsqueda parcial.
+        const terminoNormalizado = termino.toLocaleLowerCase();
+        const coincidencias = encontrados
+          .filter(file => file.name.toLocaleLowerCase().includes(terminoNormalizado))
+          .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+        if (coincidencias.length === 0) {
+          $('resultado-busqueda').textContent = `Sin resultados para "${termino}".`;
           return;
         }
 
-        estado(`Se encontraron ${encontrados.length} cómic(s).`);
-        encontrados.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-
-        for (const file of encontrados) {
+        $('resultado-busqueda').textContent = `${coincidencias.length} resultado(s) para "${termino}".`;
+        coincidencias.forEach(file => {
           const li = document.createElement('li');
           const nombre = document.createElement('span');
           nombre.textContent = '📖 ' + file.name;
@@ -168,11 +208,13 @@
           li.append(nombre, abrir);
           li.addEventListener('click', () => descargarYProcesarComic(file.id, file.name));
           lista.appendChild(li);
-        }
+        });
       } catch (err) {
-        console.error('Error al listar Drive:', err);
-        estado(err.message || 'Error al conectar con Google Drive.', true);
+        console.error('Error al buscar en Drive:', err);
+        $('resultado-busqueda').textContent = err.message || 'Error al buscar en Google Drive.';
         if (err.status === 401) cerrarSesion(false);
+      } finally {
+        $('btn-buscar').disabled = false;
       }
     }
 
@@ -193,8 +235,12 @@
         return;
       }
 
-      $('lista-comics').style.display = 'none';
-      $('visor').style.display = 'none';
+      $('biblioteca').style.display = 'none';
+      $('btn-conectar').style.display = 'none';
+      $('btn-salir').style.display = 'none';
+      $('estado').style.display = 'none';
+      $('visor').style.display = 'block';
+      $('comic-img').alt = `Cargando ${fileName}...`;
       estado(`Descargando "${fileName}"...`);
 
       try {
@@ -218,7 +264,9 @@
 
         if (archivosImagen.length === 0) {
           estado('El archivo no contiene imágenes compatibles.', true);
-          $('lista-comics').style.display = 'block';
+          $('visor').style.display = 'none';
+          $('biblioteca').style.display = 'block';
+          $('estado').style.display = 'block';
           return;
         }
 
@@ -235,11 +283,12 @@
         paginaActual = 0;
         $('visor').style.display = 'block';
         mostrarPagina();
-        estado(`Leyendo: ${fileName}`);
       } catch (err) {
         console.error('Error al abrir el cómic:', err);
+        $('visor').style.display = 'none';
+        $('biblioteca').style.display = 'block';
+        $('estado').style.display = 'block';
         estado(err.message || 'No se pudo abrir el cómic.', true);
-        $('lista-comics').style.display = 'block';
       }
     }
 
@@ -269,11 +318,18 @@
 
     function cerrarVisor() {
       $('visor').style.display = 'none';
-      $('lista-comics').style.display = 'block';
+      $('biblioteca').style.display = 'block';
+      $('btn-conectar').style.display = accessToken ? 'none' : 'inline-block';
+      $('btn-salir').style.display = accessToken ? 'inline-block' : 'none';
+      $('estado').style.display = 'block';
       limpiarPaginas();
       paginaActual = 0;
       nombreComicActual = '';
-      if (accessToken) estado('Conectado con Google Drive. Selecciona otro cómic.');
+      if (accessToken) {
+        estado('Conectado con Google Drive.');
+        $('resultado-busqueda').textContent = 'Busca otro cómic por nombre.';
+        $('buscador').focus();
+      }
     }
 
     function cerrarSesion(mostrarMensaje = true) {
