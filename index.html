@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi Visor de Cómics Personal</title>
     <link rel="icon" href="data:,">
-    <script src="https://cloudflare.com"></script>
+    
+    <!-- LIBRERÍA CORREGIDA: Cambiada al servidor alternativo de Unpkg para evitar Cloudflare -->
+    <script src="https://unpkg.com"></script>
+    
     <style>
         body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 20px; }
         .btn { background: #007bff; color: white; border: none; padding: 14px 28px; font-size: 16px; cursor: pointer; border-radius: 5px; margin: 10px; display: inline-block; font-weight: bold; }
@@ -43,7 +46,7 @@
     </div>
 
     <script>
-        // CONFIGURACIÓN: PEGA AQUÍ TU CLIENT ID
+        // CONFIGURACIÓN: REEMPLAZA ESTO CON TU CLIENT ID DE GOOGLE CLOUD
         const CLIENT_ID = '159354537005-ctmmipo3d8b2gs25l1e9rkkruertveb0.apps.googleusercontent.com';
         
         const SCOPES = 'https://googleapis.com';
@@ -51,10 +54,9 @@
         let paginasComic = [];
         let paginaActual = 0;
 
-        // URL DE REDIRECCIÓN CORREGIDA (Sin errores de sintaxis)
         const REDIRECT_URI = window.location.origin + window.location.pathname;
 
-        // Verificar si regresamos de la autenticación de Google con el Token en la URL
+        // Detectar el token que envía Google al regresar
         window.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.hash.substring(1));
             const token = params.get('access_token');
@@ -69,7 +71,7 @@
             }
         });
 
-        // Controles de teclado para PC
+        // Controles de teclado en PC
         document.addEventListener('keydown', (e) => {
             if (document.getElementById('visor').style.display === 'block') {
                 if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); cambiarPagina(1); }
@@ -78,27 +80,27 @@
             }
         });
 
-        // Redirige temporalmente a Google para el Login
+        // Enviar al usuario a la página oficial de login de Google
         function iniciarAutenticacion() {
-            const urlAuth = `https://google.com?` +
-                           `client_id=${CLIENT_ID}` +
-                           `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-                           `&response_type=token` +
-                           `&scope=${encodeURIComponent(SCOPES)}` +
-                           `&prompt=consent`;
+            const urlAuth = 'https://google.com?' +
+                           'client_id=' + CLIENT_ID +
+                           '&redirect_uri=' + encodeURIComponent(REDIRECT_URI) +
+                           '&response_type=token' +
+                           '&scope=' + encodeURIComponent(SCOPES) +
+                           '&prompt=consent';
             window.location.href = urlAuth;
         }
 
-        // Obtener la lista de archivos .cbz usando FETCH nativo
+        // Listar cómics desde Drive usando comandos web nativos
         async function listarArchivosDrive() {
             const estado = document.getElementById('estado');
             const lista = document.getElementById('lista-comics');
             lista.innerHTML = "";
 
             try {
-                const url = `https://googleapis.com{encodeURIComponent("name contains '.cbz' and trashed = false")}&fields=files(id,name,size)`;
+                const url = 'https://googleapis.com' + encodeURIComponent("name contains '.cbz' and trashed = false") + '&fields=files(id,name,size)';
                 const res = await fetch(url, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
                 });
 
                 if (!res.ok) throw new Error("Token vencido o inválido");
@@ -111,10 +113,10 @@
                     return;
                 }
 
-                estado.innerText = `[Drive] ¡Se encontraron ${files.length} cómics disponibles!`;
+                estado.innerText = '[Drive] ¡Se encontraron ' + files.length + ' cómics disponibles!';
                 files.forEach(file => {
                     const li = document.createElement('li');
-                    li.innerHTML = `<span>📖 ${file.name}</span> <b style="color:#007bff;">Abrir</b>`;
+                    li.innerHTML = '<span>📖 ' + file.name + '</span> <b style="color:#007bff;">Abrir</b>';
                     li.onclick = () => descargarYProcesarComic(file.id, file.name);
                     lista.appendChild(li);
                 });
@@ -127,16 +129,16 @@
             }
         }
 
-        // Descargar y descomprimir el archivo binario
+        // Descargar el cómic y procesarlo con JSZip
         async function descargarYProcesarComic(fileId, fileName) {
             const estado = document.getElementById('estado');
             document.getElementById('lista-comics').style.display = 'none';
-            estado.innerText = `[Descargando] Obteniendo "${fileName}" en memoria RAM...`;
+            estado.innerText = '[Descargando] Obteniendo "' + fileName + '" en memoria RAM...';
 
             try {
-                const url = `https://googleapis.com{fileId}?alt=media`;
+                const url = 'https://googleapis.com' + fileId + '?alt=media';
                 const res = await fetch(url, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
                 });
 
                 if (!res.ok) throw new Error("Falla en la descarga");
@@ -166,7 +168,7 @@
                     paginaActual = 0;
                     mostrarPagina();
                     document.getElementById('visor').style.display = 'block';
-                    estado.innerText = `[Leyendo] ${fileName}`;
+                    estado.innerText = '[Leyendo] ' + fileName;
                 } else {
                     estado.innerText = "[Error] El archivo no contiene imágenes.";
                     document.getElementById('lista-comics').style.display = 'block';
@@ -204,7 +206,7 @@
         function cerrarSesion() {
             accessToken = null;
             document.getElementById('btn-conectar').style.display = 'inline-block';
-            document.getElementById('btn-salir').style.display = 'none';
+document.getElementById('btn-salir').style.display = 'none';
 document.getElementById('lista-comics').innerHTML = "";
 document.getElementById('estado').innerText = "Sesión cerrada.";
 cerrarVisor();
