@@ -24,7 +24,12 @@
     #lista-comics li { background: #1e1e1e; padding: 12px; margin: 6px 0; cursor: pointer; border-radius: 5px; border: 1px solid #333; display: flex; gap: 12px; justify-content: space-between; align-items: center; overflow-wrap: anywhere; }
     #lista-comics li:hover { background: #252525; border-color: #007bff; }
     #biblioteca { max-width: 760px; margin: 0 auto; }
-    #buscador-contenedor { display: flex; gap: 8px; max-width: 700px; margin: 16px auto; }
+    #buscador-contenedor { display: none; gap: 8px; max-width: 700px; margin: 16px auto; }
+    #resultado-busqueda { display: none; }
+    #lista-comics li { min-width: 0; }
+    #lista-comics li .nombre-comic { display: block; flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .btn-abrir-comic { flex: 0 0 auto; background: #087cff; color: #fff; border: 1px solid #3292ff; border-radius: 5px; padding: 8px 15px; font-size: 14px; font-weight: bold; cursor: pointer; }
+    .btn-abrir-comic:hover { background: #005fc7; }
     #buscador { flex: 1; min-width: 0; padding: 13px 14px; border-radius: 5px; border: 1px solid #555; background: #202020; color: white; font-size: 16px; }
     #btn-buscar { margin: 0; }
     #visor { display: none; position: fixed; inset: 0; z-index: 1000; background: #000; width: 100%; height: 100%; height: 100dvh; margin: 0; padding: 0; overflow: hidden; }
@@ -155,6 +160,8 @@
       $('modo-vista').value = configVista.modo;
       $('modo-ajuste').value = configVista.ajuste;
       $('modo-ajuste').disabled = configVista.modo !== 'una';
+      $('sensibilidad-control').style.display = (configVista.modo === 'una' && configVista.ajuste === 'ancho' && window.matchMedia('(min-width: 481px)').matches) ? 'flex' : 'none';
+      if (configVista.modo !== 'una' || configVista.ajuste !== 'ancho') centrarImagenPorRaton();
       $('btn-anterior').style.display = configVista.modo === 'una' ? 'inline-block' : 'none';
       $('btn-siguiente').style.display = configVista.modo === 'una' ? 'inline-block' : 'none';
       renderizarVistaComic();
@@ -275,11 +282,16 @@
         if (!e.touches.length) gestoZoom = null;
       };
       cont.ondblclick = null;
-      // En PC, el cursor mueve la página en dirección contraria; la intensidad es configurable.
-      cont.onmouseenter = (e) => { ultimoMouse = { x: e.clientX, y: e.clientY }; };
-      cont.onmouseleave = () => { ultimoMouse = null; };
+      // En PC, el cursor mueve la página en sentido contrario solo en «Ajustar ancho».
+      cont.onmouseenter = (e) => {
+        if (configVista.modo === 'una' && configVista.ajuste === 'ancho') ultimoMouse = { x: e.clientX, y: e.clientY };
+      };
+      cont.onmouseleave = () => {
+        ultimoMouse = null;
+        centrarImagenPorRaton();
+      };
       cont.onmousemove = (e) => {
-        if (e.pointerType === 'touch' || configVista.modo !== 'una') return;
+        if (configVista.modo !== 'una' || configVista.ajuste !== 'ancho' || e.pointerType === 'touch') return;
         if (!ultimoMouse) { ultimoMouse = { x: e.clientX, y: e.clientY }; return; }
         const dx = e.clientX - ultimoMouse.x;
         const dy = e.clientY - ultimoMouse.y;
@@ -292,6 +304,17 @@
         aplicarZoom();
       };
     }
+
+    function centrarImagenPorRaton() {
+      desplazamientoX = 0;
+      desplazamientoY = 0;
+      ultimoMouse = null;
+      aplicarZoom();
+    }
+
+    window.addEventListener('blur', () => {
+      if ($('visor').style.display === 'block') centrarImagenPorRaton();
+    });
 
     function alternarAjuste() {
       if (configVista.modo !== 'una') return;
@@ -323,6 +346,7 @@
       });
       $('modo-ajuste').addEventListener('change', () => {
         configVista.ajuste = $('modo-ajuste').value;
+        centrarImagenPorRaton();
         guardarConfigVista();
         aplicarConfigVista();
       });
@@ -366,6 +390,8 @@
           try { localStorage.setItem(CLAVE_SESION_GOOGLE, '1'); } catch (_) {}
           $('btn-conectar').style.display = 'none';
           $('btn-salir').style.display = 'inline-block';
+          $('buscador-contenedor').style.display = 'flex';
+          $('resultado-busqueda').style.display = 'block';
           estado('Conectado con Google Drive.');
           $('resultado-busqueda').textContent = 'Escribe el nombre del cómic que quieres encontrar.';
           $('buscador').focus();
@@ -454,12 +480,18 @@
         coincidencias.forEach(file => {
           const li = document.createElement('li');
           const nombre = document.createElement('span');
+          nombre.className = 'nombre-comic';
+          nombre.title = file.name;
           nombre.textContent = '📖 ' + file.name;
-          const abrir = document.createElement('b');
+          const abrir = document.createElement('button');
+          abrir.type = 'button';
+          abrir.className = 'btn-abrir-comic';
           abrir.textContent = 'Abrir';
-          abrir.style.color = '#4da3ff';
+          abrir.addEventListener('click', (e) => {
+            e.stopPropagation();
+            descargarYProcesarComic(file.id, file.name);
+          });
           li.append(nombre, abrir);
-          li.addEventListener('click', () => descargarYProcesarComic(file.id, file.name));
           lista.appendChild(li);
         });
       } catch (err) {
@@ -592,6 +624,10 @@
     }
 
     function cerrarSesion(mostrarMensaje = true) {
+      $('buscador-contenedor').style.display = 'none';
+      $('resultado-busqueda').style.display = 'none';
+      $('lista-comics').innerHTML = '';
+      $('buscador').value = '';
       cerrarVisor();
       if (accessToken && window.google?.accounts?.oauth2) {
         google.accounts.oauth2.revoke(accessToken, () => {});
