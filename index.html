@@ -103,6 +103,13 @@
       #comicvault-reader .absolute.bottom-20.right-6 { right:8px; bottom:58px; }
       #comicvault-reader .absolute.bottom-20.right-6 button { padding:6px; }
       #library-sidebar { width:100%; max-width:none; min-width:0; border-right:0; border-bottom:1px solid #ffffff14; } #work-area { flex-direction:column; } #library-sidebar header .subtitulo { display:none; } }
+
+    @media(max-width:700px) {
+      #app-shell.busqueda-activa #reader-home { display:none !important; }
+      #app-shell.busqueda-activa #library-sidebar { flex-basis:100% !important; height:100% !important; }
+      #app-shell.busqueda-activa #work-area { flex-direction:column; }
+      #app-shell.busqueda-activa #lista-comics { min-height:0; flex:1 1 auto; }
+    }
   </style>
 </head>
 <body class="bg-darkbg text-gray-100 h-full overflow-hidden select-none">
@@ -319,11 +326,11 @@
             <!-- Controls Toolbar -->
             <div class="h-12 px-4 flex items-center justify-between text-xs sm:text-sm">
                 <div class="flex items-center space-x-2">
-                    <button id="btn-prev-page" class="p-1.5 rounded-md hover:bg-white/10 text-gray-300 hover:text-white" title="Previous Page (Left Arrow)">
+                    <button id="btn-prev-page" class="p-1.5 rounded-md hover:bg-white/10 text-gray-300 hover:text-white" title="Página anterior (flecha izquierda)">
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
                     <span id="page-indicator" class="font-medium text-gray-300 min-w-[60px] text-center">0 / 0</span>
-                    <button id="btn-next-page" class="p-1.5 rounded-md hover:bg-white/10 text-gray-300 hover:text-white" title="Next Page (Right Arrow)">
+                    <button id="btn-next-page" class="p-1.5 rounded-md hover:bg-white/10 text-gray-300 hover:text-white" title="Página siguiente (flecha derecha)">
                         <i class="fa-solid fa-chevron-right"></i>
                     </button>
                 </div>
@@ -517,8 +524,8 @@
         } else if (gestoZoom.tipo === 'mover' && e.touches.length === 1 && escalaZoom > 1) {
           e.preventDefault();
           const t = e.touches[0];
-          desplazamientoX = gestoZoom.dx + t.clientX - gestoZoom.x;
-          desplazamientoY = gestoZoom.dy + t.clientY - gestoZoom.y;
+          desplazamientoX = gestoZoom.dx + (t.clientX - gestoZoom.x) * 1.8;
+          desplazamientoY = gestoZoom.dy + (t.clientY - gestoZoom.y) * 1.8;
           aplicarZoom();
         } else if (gestoZoom.tipo === 'scroll' && e.touches.length === 1 && escalaZoom === 1) {
           e.preventDefault();
@@ -604,6 +611,15 @@
       });
       aplicarConfigVista();
       $('btn-buscar').addEventListener('click', buscarComics);
+      const shellBusqueda = $('app-shell');
+      const actualizarEspacioBusqueda = () => {
+        if (window.matchMedia('(max-width: 700px)').matches && accessToken && $('buscador').value.trim()) shellBusqueda.classList.add('busqueda-activa');
+        else shellBusqueda.classList.remove('busqueda-activa');
+      };
+      $('buscador').addEventListener('input', actualizarEspacioBusqueda);
+      $('buscador').addEventListener('focus', () => { if (window.matchMedia('(max-width: 700px)').matches && accessToken) shellBusqueda.classList.add('busqueda-activa'); });
+      $('buscador').addEventListener('blur', () => { setTimeout(() => { if (!$('buscador').value.trim()) shellBusqueda.classList.remove('busqueda-activa'); }, 180); });
+      window.addEventListener('resize', actualizarEspacioBusqueda);
       $('buscador').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') buscarComics();
       });
@@ -891,6 +907,7 @@
       $('resultado-busqueda').style.display = 'none';
       $('lista-comics').innerHTML = '';
       $('buscador').value = '';
+      $('app-shell').classList.remove('busqueda-activa');
       cerrarVisor();
       if (accessToken && window.google?.accounts?.oauth2) {
         google.accounts.oauth2.revoke(accessToken, () => {});
@@ -1048,12 +1065,12 @@
          */
         async function handleFileSelect(file) {
             if (!file.name.match(/\.(cbz|zip)$/i)) {
-                showToast('Please select a valid .cbz or .zip comic file');
+                showToast('Selecciona un archivo de cómic .cbz o .zip válido.');
                 return;
             }
 
             elements.comicTitle.textContent = file.name;
-            showToast('Opening comic archive...');
+            showToast('Abriendo el archivo del cómic…');
 
             try {
                 // Clear old Blob URLs
@@ -1073,7 +1090,7 @@
                     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
                 if (imageEntries.length === 0) {
-                    showToast('No valid images found in the archive.');
+                    showToast('No se encontraron imágenes válidas en el archivo.');
                     return;
                 }
 
@@ -1088,10 +1105,10 @@
                 await renderCurrentView();
                 updateUIState();
 
-                showToast(`Loaded ${state.pageFiles.length} pages successfully!`);
+                showToast(`¡Se cargaron ${state.pageFiles.length} páginas correctamente!`);
             } catch (err) {
                 console.error(err);
-                showToast('Error reading CBZ archive file.');
+                showToast('Error al leer el archivo CBZ.');
             }
         }
 
@@ -1368,7 +1385,7 @@
                     const t = Array.from(e.touches).find(x => x.identifier === panTouchId);
                     if (!t) return;
                     e.preventDefault();
-                    state.panX += t.clientX - panTouchX; state.panY += t.clientY - panTouchY;
+                    state.panX += (t.clientX - panTouchX) * 1.8; state.panY += (t.clientY - panTouchY) * 1.8;
                     panTouchX = t.clientX; panTouchY = t.clientY; applyTransform();
                 }
             }, {passive:false});
@@ -1613,7 +1630,18 @@
 
         function volverBiblioteca() {
             document.getElementById('comicvault-reader').style.display = 'none';
-            document.getElementById('app-shell').style.display = 'flex';
+            const shell = document.getElementById('app-shell');
+            shell.style.display = 'flex';
+            const conectado = !!accessToken;
+            document.getElementById('btn-conectar').style.display = conectado ? 'none' : 'inline-block';
+            document.getElementById('btn-salir').style.display = conectado ? 'inline-block' : 'none';
+            const nube = document.getElementById('drive-cloud-badge');
+            if (nube) {
+              nube.classList.toggle('bg-emerald-600', conectado);
+              nube.classList.toggle('text-white', conectado);
+              nube.classList.toggle('bg-gray-900', !conectado);
+              nube.classList.toggle('text-gray-400', !conectado);
+            }
         }
         document.getElementById('btn-reader-logout').addEventListener('click', () => {
             volverBiblioteca();
