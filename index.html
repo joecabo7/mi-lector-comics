@@ -53,6 +53,24 @@
     #comicvault-reader #canvas-wrapper { min-width:0; min-height:0; }
     #comicvault-reader #pages-container { max-width:100%; max-height:100%; }
     #comicvault-reader #pages-container img { max-width:100%; max-height:calc(100dvh - 125px); object-fit:contain; }
+    #comicvault-reader, #comicvault-reader * { -webkit-tap-highlight-color:transparent; }
+    #comicvault-reader #canvas-wrapper { touch-action:none; }
+    #comicvault-reader #pages-container { will-change:transform; }
+    #comicvault-reader #sidebar { min-height:0; }
+    #comicvault-reader #tab-content-thumbs, #comicvault-reader #tab-content-bookmarks { min-height:0; overscroll-behavior:contain; }
+    #comicvault-reader #settings-menu { max-width:calc(100vw - 16px); }
+    html, body { overscroll-behavior:none; }
+    @media(max-width:700px) {
+      #comicvault-reader #top-bar { height:48px; padding:0 6px; gap:2px; }
+      #comicvault-reader #top-bar > div { min-width:0; }
+      #comicvault-reader #top-bar button { padding:6px; }
+      #comicvault-reader #top-bar #comic-title { max-width:27vw; }
+      #comicvault-reader #sidebar { top:48px; bottom:0; width:min(78vw,270px); height:auto; }
+      #comicvault-reader #canvas-wrapper { overflow:hidden; }
+      #comicvault-reader #pages-container img { max-width:100vw; max-height:calc(100svh - 100px); }
+      #comicvault-reader .absolute.bottom-20.right-6 { right:5px; bottom:54px; }
+      #comicvault-reader .absolute.bottom-20.right-6 button { padding:6px; }
+    }
     /* Evita que los bloques de estado y búsqueda se superpongan en pantallas estrechas. */
     #library-sidebar, #biblioteca { min-height:0; }
     #estado { flex:0 0 auto; line-height:1.35; }
@@ -133,7 +151,7 @@
         <button class="btn" type="button" id="btn-cerrar-comic" aria-label="Cerrar cómic" title="Cerrar cómic">✕</button>
       </div>
       <div id="paginas-contenedor" class="modo-una ajuste-pantalla"><img id="comic-img" src="" alt="Página del cómic"></div>
-      <footer class="absolute bottom-0 left-0 right-0 h-10 flex items-center justify-center gap-4 bg-black/40 text-xs text-gray-400 pointer-events-none"><i class="fa-solid fa-book-open"></i><span>ComicVault Reader</span></footer>
+      <footer class="absolute bottom-0 left-0 right-0 h-10 flex items-center justify-center gap-4 bg-black/40 text-xs text-gray-400 pointer-events-none"><i class="fa-solid fa-book-open"></i><span>Lector ComicVault</span></footer>
     </main>
   </div>
 </div>
@@ -152,7 +170,7 @@
                     <span class="font-bold tracking-wide text-lg hidden sm:inline">Comic<span class="text-brand-500">Vault</span></span>
                 </div>
                 <div class="h-4 w-px bg-white/10 mx-1 hidden sm:block"></div>
-                <span id="comic-title" class="text-xs sm:text-sm text-gray-400 font-medium truncate max-w-[150px] sm:max-w-xs md:max-w-md">No file loaded</span>
+                <span id="comic-title" class="text-xs sm:text-sm text-gray-400 font-medium truncate max-w-[150px] sm:max-w-xs md:max-w-md">Ningún archivo abierto</span>
             </div>
 
             <!-- Header Controls -->
@@ -190,8 +208,8 @@
                     <div id="settings-menu" class="hidden absolute right-0 mt-2 w-56 glass-panel rounded-xl shadow-2xl p-3 z-50 text-xs">
                         <div class="font-semibold text-gray-400 uppercase tracking-wider mb-2 text-[10px]">Tema y apariencia</div>
                         <div class="grid grid-cols-3 gap-2 mb-3">
-                            <button class="theme-opt bg-gray-900 border border-brand-500 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="default">Predeterminado</button>
-                            <button class="theme-opt bg-slate-900 border border-slate-700 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="midnight">Medianoche</button>
+                            <button class="theme-opt bg-gray-900 border border-brand-500 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="default">Default</button>
+                            <button class="theme-opt bg-slate-900 border border-slate-700 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="midnight">Midnight</button>
                             <button class="theme-opt bg-black border border-gray-800 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="oled">OLED</button>
                         </div>
                         <div class="font-semibold text-gray-400 uppercase tracking-wider mb-2 text-[10px]">Ajuste de página</div>
@@ -217,10 +235,10 @@
                 <!-- Sidebar Tabs -->
                 <div class="flex border-b border-white/10 text-xs font-medium">
                     <button id="tab-btn-thumbs" class="flex-1 py-3 border-b-2 border-brand-500 text-brand-400 text-center font-semibold">
-                        <i class="fa-solid fa-border-all mr-1"></i> Pages
+                        <i class="fa-solid fa-border-all mr-1"></i> Páginas
                     </button>
                     <button id="tab-btn-bookmarks" class="flex-1 py-3 border-b-2 border-transparent text-gray-400 hover:text-gray-200 text-center">
-                        <i class="fa-solid fa-bookmark mr-1"></i> Bookmarks (<span id="bookmark-count">0</span>)
+                        <i class="fa-solid fa-bookmark mr-1"></i > Marcadores (<span id="bookmark-count">0</span>)
                     </button>
                 </div>
 
@@ -236,8 +254,8 @@
 
                 <!-- Comic Meta / Quick Actions -->
                 <div class="p-3 border-t border-white/10 bg-black/20 text-xs text-gray-400 flex items-center justify-between">
-                    <span id="sidebar-info-pages">0 / 0 pages</span>
-                    <button id="btn-add-bookmark" class="p-1.5 hover:bg-white/10 rounded text-yellow-500 transition-colors" title="Bookmark Current Page">
+                    <span id="sidebar-info-pages">0 / 0 páginas</span>
+                    <button id="btn-add-bookmark" class="p-1.5 hover:bg-white/10 rounded text-yellow-500 transition-colors" title="Marcar página actual">
                         <i class="fa-regular fa-bookmark text-sm"></i>
                     </button>
                 </div>
@@ -251,11 +269,11 @@
                     <div class="w-20 h-20 mb-4 rounded-full bg-brand-500/10 flex items-center justify-center text-brand-500 text-3xl">
                         <i class="fa-solid fa-file-arrow-up"></i>
                     </div>
-                    <h2 class="text-xl font-bold mb-2 text-gray-100">Drop your Comic file here</h2>
+                    <h2 class="text-xl font-bold mb-2 text-gray-100">Suelta aquí tu cómic</h2>
                     <p class="text-sm text-gray-400 mb-6 max-w-sm">Supports standard <span class="text-brand-400 font-semibold">.CBZ</span> and <span class="text-brand-400 font-semibold">.ZIP</span> comic archives.</p>
                     <button class="bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-600/30 flex items-center space-x-2">
                         <i class="fa-solid fa-plus"></i>
-                        <span>Select File</span>
+                        <span>Seleccionar archivo</span>
                     </button>
                 </div>
 
@@ -1197,7 +1215,7 @@
             
             // Text indicators
             elements.pageIndicator.textContent = `${current} / ${total}`;
-            elements.sidebarInfoPages.textContent = `${current} / ${total} pages`;
+            elements.sidebarInfoPages.textContent = `${current} / ${total} páginas`;
             elements.pageSlider.max = total || 1;
             elements.pageSlider.value = current;
 
@@ -1316,6 +1334,29 @@
                 }
             }, { passive: false });
 
+            // Zoom táctil mediante pellizco.
+            let pinchStartDistance = 0, pinchStartZoom = 1;
+            elements.canvasWrapper.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    pinchStartDistance = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+                    pinchStartZoom = state.zoomLevel;
+                }
+            }, {passive:false});
+            elements.canvasWrapper.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 2 && pinchStartDistance > 0) {
+                    e.preventDefault();
+                    const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+                    state.zoomLevel = Math.max(0.5, Math.min(3.5, pinchStartZoom*d/pinchStartDistance));
+                    if (state.zoomLevel <= 1) { state.panX=0; state.panY=0; }
+                    applyTransform();
+                }
+            }, {passive:false});
+            elements.canvasWrapper.addEventListener('touchend', e => { if(e.touches.length<2) pinchStartDistance=0; }, {passive:true});
+            elements.pagesContainer.addEventListener('click', e => {
+                if (e.target.closest('img')) { elements.sidebar.classList.add('-translate-x-full'); state.sidebarOpen=false; }
+            });
+
             // Drag / Pan capability
             elements.canvasWrapper.addEventListener('mousedown', (e) => {
                 if (state.zoomLevel > 1) {
@@ -1381,10 +1422,10 @@
                 const bmIndex = state.bookmarks.indexOf(idx);
                 if (bmIndex > -1) {
                     state.bookmarks.splice(bmIndex, 1);
-                    showToast(`Bookmark removed for page ${idx + 1}`);
+                    showToast(`Se quitó el marcador de la página ${idx + 1}`);
                 } else {
                     state.bookmarks.push(idx);
-                    showToast(`Page ${idx + 1} bookmarked!`);
+                    showToast(`Página ${idx + 1} añadida a marcadores`);
                 }
                 renderBookmarksList();
                 updateUIState();
@@ -1394,7 +1435,7 @@
             elements.btnPageMode.addEventListener('click', () => {
                 state.isDoublePage = !state.isDoublePage;
                 elements.btnPageMode.classList.toggle('text-brand-400', state.isDoublePage);
-                showToast(state.isDoublePage ? 'Double Page Display' : 'Single Page Display');
+                showToast(state.isDoublePage ? 'Vista de dos páginas' : 'Vista de una página');
                 renderCurrentView();
             });
 
@@ -1404,7 +1445,7 @@
                 elements.btnReadingDir.innerHTML = state.readingDirection === 'LTR' 
                     ? '<i class="fa-solid fa-arrow-right-to-line text-lg"></i>' 
                     : '<i class="fa-solid fa-arrow-left-to-line text-lg text-brand-400"></i>';
-                showToast(`Dirección de lectura: ${state.readingDirection}`);
+                showToast(`Dirección de lectura: ${state.readingDirection === 'LTR' ? 'izquierda a derecha' : 'derecha a izquierda'}`);
                 renderCurrentView();
             });
 
@@ -1434,7 +1475,7 @@
                 btn.addEventListener('click', () => {
                     const theme = btn.dataset.theme;
                     document.body.className = `bg-darkbg text-gray-100 font-sans h-full overflow-hidden select-none theme-${theme}`;
-                    showToast(`Theme updated`);
+                    showToast('Tema actualizado');
                 });
             });
 
