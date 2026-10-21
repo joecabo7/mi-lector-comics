@@ -19,6 +19,8 @@
     body { font-family: Inter, Arial, sans-serif !important; margin:0; padding:0; background:#0f1117; }
     .glass-panel { background:rgba(24,27,35,.85); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,.08); }
     #visor { display:none !important; }
+    #reader-home { display:none !important; }
+    #reader-empty { display:none !important; }
     #app-shell { height:100dvh; width:100%; display:flex; flex-direction:column; overflow:hidden; background:#0f1117; color:#f3f4f6; }
     #library-sidebar { width:290px; min-width:260px; max-width:82vw; background:#181b23; border-right:1px solid #ffffff14; display:flex; flex-direction:column; overflow:hidden; }
     #biblioteca { max-width:none; margin:0; padding:12px; display:flex; flex-direction:column; min-height:0; flex:1; }
@@ -144,11 +146,15 @@
         <p id="resultado-busqueda" class="ayuda text-gray-400" aria-live="polite">Conecta con Google Drive para buscar tus cómics.</p>
         <ul id="lista-comics"></ul>
       </section>
-      <div class="p-3 border-t border-white/10 text-[11px] text-gray-500"><i class="fa-solid fa-shield-halved mr-1"></i> Biblioteca privada de Google Drive</div>
+      <div class="p-3 border-t border-white/10 text-center shrink-0">
+        <button id="btn-open-file" type="button" class="inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all shadow-lg shadow-green-600/30 mb-2" title="Abrir cómic desde este dispositivo">
+          <i class="fa-solid fa-folder-open"></i><span>Abrir archivo</span>
+        </button>
+        <div class="text-[11px] text-gray-500"><i class="fa-solid fa-shield-halved mr-1"></i> Biblioteca privada de Google Drive</div>
+      </div>
     </aside>
-    <div id="reader-home" class="flex-1 min-w-0 flex items-center justify-center text-center text-gray-500 p-6">
-      <div><i class="fa-solid fa-book-open text-4xl mb-4 text-gray-700"></i><div class="font-semibold text-gray-300">Tu espacio de lectura</div><p class="text-sm mt-2">Conecta Google Drive y abre un cómic desde tu biblioteca.</p></div>
-    </div>
+    <div id="reader-home" class="hidden" aria-hidden="true"></div>
+    <input type="file" id="file-input" accept=".cbz,.zip" class="hidden">
     <main id="visor" aria-label="Lector de cómics">
       <div id="reader-empty"><i class="fa-solid fa-book-open"></i><div class="font-semibold text-gray-400">Tu espacio de lectura</div><p class="text-sm mt-2">Conecta Google Drive y abre un cómic desde tu biblioteca.</p></div>
       <div class="visor-barra">
@@ -184,12 +190,11 @@
 
             <!-- Header Controls -->
             <div class="flex items-center space-x-1 sm:space-x-2">
-                <!-- Open File Button -->
-                <button id="btn-open-file" type="button" class="flex items-center space-x-2 bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg shadow-brand-600/30" title="Abrir cómic desde este dispositivo">
-                    <i class="fa-solid fa-folder-open"></i>
-                    <span>Abrir archivo</span>
+                <!-- Volver a mostrar la biblioteca y abrir archivos locales -->
+                <button id="btn-reader-library" type="button" class="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all" title="Mostrar u ocultar biblioteca">
+                    <i class="fa-solid fa-book-bookmark"></i>
+                    <span>Biblioteca</span>
                 </button>
-                <input type="file" id="file-input" accept=".cbz,.zip" class="hidden">
 
                 <button id="btn-reader-logout" class="flex items-center space-x-1 bg-red-600/80 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium" title="Cerrar sesión de Google"><i class="fa-solid fa-right-from-bracket"></i><span>Cerrar sesión</span></button>
 
@@ -1057,6 +1062,10 @@
                 e.preventDefault();
                 elements.fileInput.click();
             });
+            const btnReaderLibrary = document.getElementById('btn-reader-library');
+            if (btnReaderLibrary && elements.btnSidebarToggle) {
+                btnReaderLibrary.addEventListener('click', () => elements.btnSidebarToggle.click());
+            }
 
             elements.fileInput.addEventListener('change', (e) => {
                 if (e.target.files.length > 0) {
