@@ -26,9 +26,20 @@
     #buscador { flex: 1; min-width: 0; padding: 13px 14px; border-radius: 5px; border: 1px solid #555; background: #202020; color: white; font-size: 16px; }
     #btn-buscar { margin: 0; }
     #visor { display: none; position: fixed; inset: 0; z-index: 1000; background: #000; width: 100%; height: 100%; height: 100dvh; margin: 0; padding: 0; overflow: hidden; }
-    .visor-barra { position: absolute; z-index: 2; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
-    .visor-barra .btn { margin: 0; padding: 10px 14px; box-shadow: 0 2px 10px #0008; }
-    #comic-img { width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: 0 auto; box-shadow: none; }
+    .visor-barra { position: absolute; z-index: 3; top: max(8px, env(safe-area-inset-top)); left: 8px; right: 8px; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+    .visor-barra > * { pointer-events: auto; }
+    .visor-barra .btn { margin: 0; padding: 9px 11px; font-size: 14px; box-shadow: 0 2px 10px #0008; }
+    .visor-barra select { max-width: 175px; min-width: 0; padding: 9px 7px; color: #fff; background: #242424; border: 1px solid #666; border-radius: 5px; font-size: 14px; }
+    #paginas-contenedor { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y pinch-zoom; }
+    #paginas-contenedor.modo-una { display: flex; justify-content: center; align-items: flex-start; }
+    #paginas-contenedor.ajuste-pantalla { align-items: center; }
+    #paginas-contenedor.modo-multiple-vertical { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 58px 0 12px; }
+    #paginas-contenedor.modo-multiple-horizontal { display: flex; flex-direction: row; align-items: center; gap: 3px; padding: 58px 12px 12px; overflow-x: auto; overflow-y: hidden; }
+    #comic-img, .pagina-comic { display: block; flex: 0 0 auto; margin: 0 auto; box-shadow: none; object-fit: contain; max-width: none; }
+    #paginas-contenedor.modo-una.ajuste-pantalla #comic-img { width: 100%; height: 100%; object-fit: contain; }
+    #paginas-contenedor.modo-una.ajuste-ancho #comic-img { width: 100%; height: auto; object-fit: contain; }
+    #paginas-contenedor.modo-multiple-vertical .pagina-comic { width: 100%; height: auto; }
+    #paginas-contenedor.modo-multiple-horizontal .pagina-comic { height: calc(100% - 70px); width: auto; max-width: 95vw; object-fit: contain; }
     .controles { margin-bottom: 15px; }
     #estado { color: #00ff88; margin: 15px auto; max-width: 900px; font-family: monospace; font-size: 14px; overflow-wrap: anywhere; }
     .ayuda { color: #bbb; font-size: 13px; max-width: 700px; margin: 12px auto; line-height: 1.5; }
@@ -38,6 +49,9 @@
       #lista-comics li { padding: 11px; }
       #buscador-contenedor { gap: 6px; }
       #buscador { padding: 12px 10px; }
+      .visor-barra { left: 5px; right: 5px; gap: 4px; }
+      .visor-barra .btn { padding: 8px 9px; font-size: 12px; }
+      .visor-barra select { max-width: 120px; padding: 8px 5px; font-size: 12px; }
     }
   </style>
 </head>
@@ -62,9 +76,22 @@
 
   <div id="visor">
     <div class="visor-barra">
-      <button class="btn" type="button" id="btn-cerrar-comic" style="background:#dc3545;">✖ Cerrar cómic</button>
+      <button class="btn" type="button" id="btn-anterior" aria-label="Página anterior">◀</button>
+      <button class="btn" type="button" id="btn-siguiente" aria-label="Página siguiente">▶</button>
+      <select id="modo-vista" aria-label="Modo de visualización" title="Modo de visualización">
+        <option value="una">Una página</option>
+        <option value="vertical">Varias vertical</option>
+        <option value="horizontal">Varias horizontal</option>
+      </select>
+      <select id="modo-ajuste" aria-label="Ajuste de página" title="Ajuste de página">
+        <option value="pantalla">Ajustar pantalla</option>
+        <option value="ancho">Ajustar ancho</option>
+      </select>
+      <button class="btn" type="button" id="btn-cerrar-comic" style="background:#dc3545;">✖ Cerrar</button>
     </div>
-    <img id="comic-img" src="" alt="Página del cómic">
+    <div id="paginas-contenedor" class="modo-una ajuste-pantalla">
+      <img id="comic-img" src="" alt="Página del cómic">
+    </div>
   </div>
 
   <script>
@@ -78,8 +105,66 @@
     let paginasComic = [];
     let paginaActual = 0;
     let nombreComicActual = '';
+    const CLAVE_CONFIG_VISTA = 'mi_lector_comics_config_vista';
+    let configVista = cargarConfigVista();
 
     const $ = (id) => document.getElementById(id);
+
+    function cargarConfigVista() {
+      const predeterminada = { modo: 'una', ajuste: 'pantalla' };
+      try {
+        const guardada = JSON.parse(localStorage.getItem('mi_lector_comics_config_vista') || 'null');
+        if (guardada && ['una', 'vertical', 'horizontal'].includes(guardada.modo) &&
+            ['pantalla', 'ancho'].includes(guardada.ajuste)) return guardada;
+      } catch (_) {}
+      return predeterminada;
+    }
+
+    function guardarConfigVista() {
+      try { localStorage.setItem(CLAVE_CONFIG_VISTA, JSON.stringify(configVista)); } catch (_) {}
+    }
+
+    function aplicarConfigVista() {
+      const cont = $('paginas-contenedor');
+      cont.classList.remove('modo-una', 'modo-multiple-vertical', 'modo-multiple-horizontal', 'ajuste-pantalla', 'ajuste-ancho');
+      cont.classList.add(configVista.modo === 'una' ? 'modo-una' :
+        configVista.modo === 'vertical' ? 'modo-multiple-vertical' : 'modo-multiple-horizontal');
+      if (configVista.modo === 'una') cont.classList.add(configVista.ajuste === 'ancho' ? 'ajuste-ancho' : 'ajuste-pantalla');
+      $('modo-vista').value = configVista.modo;
+      $('modo-ajuste').value = configVista.ajuste;
+      $('modo-ajuste').disabled = configVista.modo !== 'una';
+      $('btn-anterior').style.display = configVista.modo === 'una' ? 'inline-block' : 'none';
+      $('btn-siguiente').style.display = configVista.modo === 'una' ? 'inline-block' : 'none';
+      renderizarVistaComic();
+    }
+
+    function renderizarVistaComic() {
+      const cont = $('paginas-contenedor');
+      if (!paginasComic.length) return;
+      if (configVista.modo === 'una') {
+        cont.innerHTML = '<img id="comic-img" alt="Página del cómic">';
+        $('comic-img').src = paginasComic[paginaActual];
+        $('comic-img').addEventListener('dblclick', alternarAjuste);
+      } else {
+        cont.innerHTML = '';
+        paginasComic.forEach((url, i) => {
+          const img = document.createElement('img');
+          img.className = 'pagina-comic';
+          img.src = url;
+          img.alt = `Página ${i + 1}`;
+          img.loading = i > 3 ? 'lazy' : 'eager';
+          img.addEventListener('dblclick', alternarAjuste);
+          cont.appendChild(img);
+        });
+      }
+    }
+
+    function alternarAjuste() {
+      if (configVista.modo !== 'una') return;
+      configVista.ajuste = configVista.ajuste === 'pantalla' ? 'ancho' : 'pantalla';
+      guardarConfigVista();
+      aplicarConfigVista();
+    }
     const estado = (mensaje, error = false) => {
       $('estado').textContent = mensaje;
       $('estado').style.color = error ? '#ff6b6b' : '#00ff88';
@@ -89,6 +174,19 @@
       $('btn-conectar').addEventListener('click', iniciarAutenticacion);
       $('btn-salir').addEventListener('click', cerrarSesion);
       $('btn-cerrar-comic').addEventListener('click', cerrarVisor);
+      $('btn-anterior').addEventListener('click', () => cambiarPagina(-1));
+      $('btn-siguiente').addEventListener('click', () => cambiarPagina(1));
+      $('modo-vista').addEventListener('change', () => {
+        configVista.modo = $('modo-vista').value;
+        guardarConfigVista();
+        aplicarConfigVista();
+      });
+      $('modo-ajuste').addEventListener('change', () => {
+        configVista.ajuste = $('modo-ajuste').value;
+        guardarConfigVista();
+        aplicarConfigVista();
+      });
+      aplicarConfigVista();
       $('btn-buscar').addEventListener('click', buscarComics);
       $('buscador').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') buscarComics();
@@ -238,7 +336,7 @@
       $('btn-salir').style.display = 'none';
       $('estado').style.display = 'none';
       $('visor').style.display = 'block';
-      $('comic-img').alt = `Cargando ${fileName}...`;
+      $('paginas-contenedor').innerHTML = '<div style="color:white;padding:80px 20px;">Cargando cómic...</div>';
       estado(`Descargando "${fileName}"...`);
 
       try {
@@ -280,6 +378,7 @@
         nombreComicActual = fileName;
         paginaActual = 0;
         $('visor').style.display = 'block';
+        aplicarConfigVista();
         mostrarPagina();
       } catch (err) {
         console.error('Error al abrir el cómic:', err);
@@ -292,8 +391,15 @@
 
     function mostrarPagina() {
       if (!paginasComic.length) return;
-      $('comic-img').src = paginasComic[paginaActual];
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (configVista.modo === 'una') {
+        const img = $('comic-img');
+        if (img) img.src = paginasComic[paginaActual];
+        const cont = $('paginas-contenedor');
+        cont.scrollTop = 0;
+        cont.scrollLeft = 0;
+      }
+      $('btn-anterior').disabled = paginaActual === 0;
+      $('btn-siguiente').disabled = paginaActual === paginasComic.length - 1;
     }
 
     function cambiarPagina(direccion) {
@@ -307,7 +413,8 @@
     function limpiarPaginas() {
       paginasComic.forEach(url => URL.revokeObjectURL(url));
       paginasComic = [];
-      $('comic-img').removeAttribute('src');
+      const cont = $('paginas-contenedor');
+      if (cont) cont.innerHTML = '<img id="comic-img" alt="Página del cómic">';
     }
 
     function cerrarVisor() {
@@ -341,25 +448,16 @@
 
     document.addEventListener('keydown', (e) => {
       if ($('visor').style.display !== 'block') return;
-      if (e.key === 'ArrowRight' || e.key === ' ') {
+      if (e.key === 'Escape') cerrarVisor();
+      if (configVista.modo === 'una' && (e.key === 'ArrowRight' || e.key === ' ')) {
         e.preventDefault();
         cambiarPagina(1);
       }
-      if (e.key === 'ArrowLeft') cambiarPagina(-1);
-      if (e.key === 'Escape') cerrarVisor();
+      if (configVista.modo === 'una' && e.key === 'ArrowLeft') cambiarPagina(-1);
     });
 
-    // Gestos táctiles para pasar página en celulares.
-    let touchStartX = null;
-    $('comic-img').addEventListener('touchstart', e => {
-      touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-    $('comic-img').addEventListener('touchend', e => {
-      if (touchStartX === null) return;
-      const delta = e.changedTouches[0].screenX - touchStartX;
-      if (Math.abs(delta) > 45) cambiarPagina(delta < 0 ? 1 : -1);
-      touchStartX = null;
-    }, { passive: true });
+    // No se usan gestos de deslizamiento para cambiar de página:
+    // así el desplazamiento/zoom táctil en móviles no cambia accidentalmente de imagen.
   </script>
 </body>
 </html>
