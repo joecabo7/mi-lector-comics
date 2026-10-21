@@ -27,6 +27,7 @@
     #buscador-contenedor { display: none; gap: 8px; max-width: 700px; margin: 16px auto; }
     #resultado-busqueda { display: none; }
     #lista-comics li { min-width: 0; }
+    #lista-comics li .portada-comic { width: 58px; height: 78px; object-fit: contain; flex: 0 0 58px; background:#111; border-radius:4px; }
     #lista-comics li .nombre-comic { display: block; flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .btn-abrir-comic { flex: 0 0 auto; background: #087cff; color: #fff; border: 1px solid #3292ff; border-radius: 5px; padding: 8px 15px; font-size: 14px; font-weight: bold; cursor: pointer; }
     .btn-abrir-comic:hover { background: #005fc7; }
@@ -45,7 +46,8 @@
     #sensibilidad-valor { min-width:22px; text-align:right; }
     #btn-cerrar-comic { background:rgba(220,53,69,.82) !important; }
     #btn-cerrar-comic:hover { background:rgba(189,33,48,.94) !important; }
-    #paginas-contenedor { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y pinch-zoom; }
+    #paginas-contenedor { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+    #paginas-contenedor img { touch-action: none; }
     #paginas-contenedor.modo-una { display: flex; justify-content: center; align-items: flex-start; }
     #paginas-contenedor.ajuste-pantalla { align-items: center; }
     #paginas-contenedor.modo-multiple-vertical { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 58px 0 12px; }
@@ -114,7 +116,9 @@
   <script>
     // Este ID debe ser de un cliente OAuth de tipo "Aplicación web".
     const CLIENT_ID = '159354537005-ctmmipo3d8b2gs25l1e9rkkruertveb0.apps.googleusercontent.com';
-    const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+    const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email';
+    // IMPORTANTE: reemplaza este valor por el correo exacto de tu cuenta Google.
+    const ALLOWED_GOOGLE_EMAIL = 'REEMPLAZA_POR_TU_CORREO@gmail.com'.toLowerCase();
     const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 
     let accessToken = null;
@@ -183,10 +187,12 @@
           img.className = 'pagina-comic';
           img.src = url;
           img.alt = `Página ${i + 1}`;
+          img.dataset.zoomScale = '1'; img.dataset.zoomX = '0'; img.dataset.zoomY = '0';
           img.loading = i > 3 ? 'lazy' : 'eager';
           img.addEventListener('dblclick', alternarAjuste);
           cont.appendChild(img);
         });
+        configurarGestosZoom();
       }
     }
 
@@ -220,88 +226,61 @@
 
     function configurarGestosZoom() {
       const cont = $('paginas-contenedor');
-      const img = $('comic-img');
-      if (!cont || !img) return;
+      if (!cont) return;
+      let gesto = null;
+      const getImage = (target) => target?.closest?.('img.pagina-comic, img#comic-img') || (configVista.modo === 'una' ? $('comic-img') : null);
+      const centro = (touches) => ({ x:(touches[0].clientX+touches[1].clientX)/2, y:(touches[0].clientY+touches[1].clientY)/2 });
       cont.ontouchstart = (e) => {
-        if (configVista.modo !== 'una') return;
-        if (e.touches.length === 2) {
+        const img = getImage(e.target);
+        if (e.touches.length === 2 && img) {
           e.preventDefault();
-          const a = e.touches[0], b = e.touches[1];
-          const centroX = (a.clientX + b.clientX) / 2;
-          const centroY = (a.clientY + b.clientY) / 2;
-          // Guarda el punto de la imagen que queda justo debajo del centro de los dedos.
-          const rect = img.getBoundingClientRect();
-          gestoZoom = {
-            tipo: 'pinza',
-            distancia: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY),
-            escala: escalaZoom,
-            baseX: rect.left - desplazamientoX,
-            baseY: rect.top - desplazamientoY,
-            puntoX: (centroX - rect.left) / escalaZoom,
-            puntoY: (centroY - rect.top) / escalaZoom
-          };
-        } else if (e.touches.length === 1 && escalaZoom > 1) {
-          const t = e.touches[0];
-          gestoZoom = { tipo: 'mover', x: t.clientX, y: t.clientY, dx: desplazamientoX, dy: desplazamientoY };
-        } else if (e.touches.length === 1 && escalaZoom === 1) {
-          const t = e.touches[0];
-          gestoZoom = { tipo: 'scroll', x: t.clientX, y: t.clientY, left: cont.scrollLeft, top: cont.scrollTop };
-        } else gestoZoom = null;
+          const c = centro(e.touches), rect = img.getBoundingClientRect();
+          const scale = Number(img.dataset.zoomScale || 1);
+          const tx = Number(img.dataset.zoomX || 0), ty = Number(img.dataset.zoomY || 0);
+          gesto = { type:'pinch', img, distance:Math.max(1,Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY)), scale, tx, ty,
+            pointX:(c.x-rect.left-tx)/scale, pointY:(c.y-rect.top-ty)/scale, baseLeft:rect.left-tx, baseTop:rect.top-ty };
+        } else if (e.touches.length === 1) {
+          const t=e.touches[0];
+          const activeImg = getImage(e.target);
+          const scale = activeImg ? Number(activeImg.dataset.zoomScale || 1) : 1;
+          if (activeImg && scale > 1) {
+            e.preventDefault();
+            gesto={type:'pan',img:activeImg,x:t.clientX,y:t.clientY,tx:Number(activeImg.dataset.zoomX||0),ty:Number(activeImg.dataset.zoomY||0)};
+          } else {
+            gesto={type:'scroll',x:t.clientX,y:t.clientY,left:cont.scrollLeft,top:cont.scrollTop};
+          }
+        } else gesto=null;
       };
       cont.ontouchmove = (e) => {
-        if (!gestoZoom || configVista.modo !== 'una') return;
-        if (gestoZoom.tipo === 'pinza' && e.touches.length === 2) {
+        if (!gesto) return;
+        if (gesto.type==='pinch' && e.touches.length===2) {
           e.preventDefault();
-          const a = e.touches[0], b = e.touches[1];
-          const distancia = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
-          const nuevoCentroX = (a.clientX + b.clientX) / 2;
-          const nuevoCentroY = (a.clientY + b.clientY) / 2;
-          escalaZoom = Math.max(1, Math.min(5, gestoZoom.escala * distancia / Math.max(1, gestoZoom.distancia)));
-          // Mantiene el punto bajo los dedos fijo mientras se amplía o se pellizca.
-          desplazamientoX = nuevoCentroX - gestoZoom.baseX - gestoZoom.puntoX * escalaZoom;
-          desplazamientoY = nuevoCentroY - gestoZoom.baseY - gestoZoom.puntoY * escalaZoom;
-          if (escalaZoom === 1) {
-            desplazamientoX = 0;
-            desplazamientoY = 0;
-          }
-          aplicarZoom();
-        } else if (gestoZoom.tipo === 'mover' && e.touches.length === 1 && escalaZoom > 1) {
-          e.preventDefault();
-          const t = e.touches[0];
-          desplazamientoX = gestoZoom.dx + t.clientX - gestoZoom.x;
-          desplazamientoY = gestoZoom.dy + t.clientY - gestoZoom.y;
-          aplicarZoom();
-        } else if (gestoZoom.tipo === 'scroll' && e.touches.length === 1 && escalaZoom === 1) {
-          e.preventDefault();
-          const t = e.touches[0];
-          cont.scrollTop = gestoZoom.top + gestoZoom.y - t.clientY;
-          cont.scrollLeft = gestoZoom.left + gestoZoom.x - t.clientX;
+          const c=centro(e.touches), dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+          const scale=Math.max(1,Math.min(5,gesto.scale*dist/gesto.distance));
+          let tx=c.x-gesto.baseLeft-gesto.pointX*scale, ty=c.y-gesto.baseTop-gesto.pointY*scale;
+          if(scale===1){tx=0;ty=0;}
+          gesto.img.dataset.zoomScale=String(scale); gesto.img.dataset.zoomX=String(tx); gesto.img.dataset.zoomY=String(ty);
+          gesto.img.style.transformOrigin='0 0'; gesto.img.style.transform=scale===1?'':`translate(${tx}px,${ty}px) scale(${scale})`;
+          cont.classList.toggle('zoom-activo',scale>1);
+          if (configVista.modo==='una') { escalaZoom=scale; desplazamientoX=tx; desplazamientoY=ty; }
+        } else if (gesto.type==='pan' && e.touches.length===1) {
+          e.preventDefault(); const t=e.touches[0], tx=gesto.tx+t.clientX-gesto.x, ty=gesto.ty+t.clientY-gesto.y;
+          gesto.img.dataset.zoomX=String(tx); gesto.img.dataset.zoomY=String(ty);
+          gesto.img.style.transformOrigin='0 0'; gesto.img.style.transform=`translate(${tx}px,${ty}px) scale(${gesto.img.dataset.zoomScale||1})`;
+          if (configVista.modo==='una') { desplazamientoX=tx; desplazamientoY=ty; }
+        } else if (gesto.type==='scroll' && e.touches.length===1) {
+          const t=e.touches[0]; cont.scrollTop=gesto.top+gesto.y-t.clientY; cont.scrollLeft=gesto.left+gesto.x-t.clientX;
         }
       };
-      cont.ontouchend = (e) => {
-        if (!e.touches.length) gestoZoom = null;
-      };
-      cont.ondblclick = null;
-      // En PC, el cursor mueve la página en sentido contrario solo en «Ajustar ancho».
-      cont.onmouseenter = (e) => {
-        if (configVista.modo === 'una' && configVista.ajuste === 'ancho') ultimoMouse = { x: e.clientX, y: e.clientY };
-      };
-      cont.onmouseleave = () => {
-        ultimoMouse = null;
-        centrarImagenPorRaton();
-      };
+      cont.ontouchend = (e) => { if (!e.touches.length) gesto=null; };
+      cont.onmouseenter = (e) => { if (configVista.modo === 'una' && configVista.ajuste === 'ancho') ultimoMouse = { x:e.clientX,y:e.clientY }; };
+      cont.onmouseleave = () => { ultimoMouse=null; centrarImagenPorRaton(); };
       cont.onmousemove = (e) => {
         if (configVista.modo !== 'una' || configVista.ajuste !== 'ancho' || e.pointerType === 'touch') return;
-        if (!ultimoMouse) { ultimoMouse = { x: e.clientX, y: e.clientY }; return; }
-        const dx = e.clientX - ultimoMouse.x;
-        const dy = e.clientY - ultimoMouse.y;
-        ultimoMouse = { x: e.clientX, y: e.clientY };
-        const factor = sensibilidadMouse / 100;
-        const maxX = Math.max(40, cont.clientWidth * 0.45);
-        const maxY = Math.max(40, cont.clientHeight * 0.45);
-        desplazamientoX = Math.max(-maxX, Math.min(maxX, desplazamientoX - dx * factor));
-        desplazamientoY = Math.max(-maxY, Math.min(maxY, desplazamientoY - dy * factor));
-        aplicarZoom();
+        if (!ultimoMouse) { ultimoMouse={x:e.clientX,y:e.clientY}; return; }
+        const dx=e.clientX-ultimoMouse.x, dy=e.clientY-ultimoMouse.y; ultimoMouse={x:e.clientX,y:e.clientY};
+        const factor=sensibilidadMouse/100, maxX=Math.max(40,cont.clientWidth*.45), maxY=Math.max(40,cont.clientHeight*.45);
+        desplazamientoX=Math.max(-maxX,Math.min(maxX,desplazamientoX-dx*factor)); desplazamientoY=Math.max(-maxY,Math.min(maxY,desplazamientoY-dy*factor)); aplicarZoom();
       };
     }
 
@@ -386,13 +365,36 @@
             return;
           }
           accessToken = response.access_token;
+          try {
+            if (!ALLOWED_GOOGLE_EMAIL || ALLOWED_GOOGLE_EMAIL.startsWith('reemplaza_')) {
+              throw new Error('Configura ALLOWED_GOOGLE_EMAIL en el código con tu correo de Google antes de usar el lector.');
+            }
+            const identidad = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + accessToken } });
+            if (!identidad.ok) throw new Error('No se pudo verificar la cuenta de Google. Vuelve a iniciar sesión.');
+            const usuario = await identidad.json();
+            if (!usuario.email || usuario.email.toLowerCase() !== ALLOWED_GOOGLE_EMAIL || usuario.email_verified !== true) {
+              if (window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(accessToken, () => {});
+              accessToken = null;
+              throw new Error('Acceso denegado: esta aplicación solo admite la cuenta de Google autorizada.');
+            }
+          } catch (identityError) {
+            accessToken = null;
+            recordarSesionGoogle = false;
+            try { localStorage.removeItem(CLAVE_SESION_GOOGLE); } catch (_) {}
+            $('btn-conectar').style.display = 'inline-block';
+            $('btn-salir').style.display = 'none';
+            $('buscador-contenedor').style.display = 'none';
+            $('resultado-busqueda').style.display = 'none';
+            estado(identityError.message || 'No se pudo verificar la cuenta autorizada.', true);
+            return;
+          }
           recordarSesionGoogle = true;
           try { localStorage.setItem(CLAVE_SESION_GOOGLE, '1'); } catch (_) {}
           $('btn-conectar').style.display = 'none';
           $('btn-salir').style.display = 'inline-block';
           $('buscador-contenedor').style.display = 'flex';
           $('resultado-busqueda').style.display = 'block';
-          estado('Conectado con Google Drive.');
+          estado('Cuenta autorizada. Conectado con Google Drive.');
           $('resultado-busqueda').textContent = 'Escribe el nombre del cómic que quieres encontrar.';
           $('buscador').focus();
         },
@@ -479,10 +481,17 @@
         $('resultado-busqueda').textContent = `${coincidencias.length} resultado(s) para "${termino}".`;
         coincidencias.forEach(file => {
           const li = document.createElement('li');
+          const portada = document.createElement('img');
+          portada.className = 'portada-comic';
+          portada.alt = 'Portada de ' + file.name;
+          portada.loading = 'lazy';
+          portada.src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="58" height="78"><rect width="100%" height="100%" fill="#252525"/><text x="50%" y="50%" fill="#aaa" font-size="10" text-anchor="middle" dominant-baseline="middle">CBZ</text></svg>');
+          portada.dataset.fileId = file.id;
+          portada.dataset.loaded = '0';
           const nombre = document.createElement('span');
           nombre.className = 'nombre-comic';
           nombre.title = file.name;
-          nombre.textContent = '📖 ' + file.name;
+          nombre.textContent = file.name;
           const abrir = document.createElement('button');
           abrir.type = 'button';
           abrir.className = 'btn-abrir-comic';
@@ -491,8 +500,9 @@
             e.stopPropagation();
             descargarYProcesarComic(file.id, file.name);
           });
-          li.append(nombre, abrir);
+          li.append(portada, nombre, abrir);
           lista.appendChild(li);
+          observarPortada(portada, file.id, file.name);
         });
       } catch (err) {
         console.error('Error al buscar en Drive:', err);
@@ -501,6 +511,38 @@
       } finally {
         $('btn-buscar').disabled = false;
       }
+    }
+
+    // Las portadas se extraen bajo demanda cuando el resultado se acerca a la pantalla.
+    const observadorPortadas = ('IntersectionObserver' in window) ? new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          observadorPortadas.unobserve(entry.target);
+          cargarPortada(entry.target, entry.target.dataset.fileId, entry.target.alt.replace(/^Portada de /, ''));
+        }
+      });
+    }, { rootMargin: '180px' }) : null;
+
+    function observarPortada(img, fileId, fileName) {
+      if (observadorPortadas) observadorPortadas.observe(img);
+      else cargarPortada(img, fileId, fileName);
+    }
+
+    async function cargarPortada(img, fileId, fileName) {
+      if (!accessToken || img.dataset.loaded === '1') return;
+      img.dataset.loaded = '1';
+      try {
+        const res = await fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`, { headers: { Authorization: 'Bearer ' + accessToken } });
+        if (!res.ok) return;
+        const zip = await JSZip.loadAsync(await res.blob());
+        const imgs = [];
+        zip.forEach((path, entry) => { if (!entry.dir && /\.(jpe?g|jfif|png|webp|gif|avif)$/i.test(entry.name)) imgs.push(entry); });
+        imgs.sort((a,b) => a.name.localeCompare(b.name, undefined, { numeric:true, sensitivity:'base' }));
+        if (!imgs.length || !img.isConnected) return;
+        const blob = await imgs[0].async('blob');
+        if (!img.isConnected) return;
+        img.src = URL.createObjectURL(blob);
+      } catch (e) { console.warn('No se pudo extraer portada de ' + fileName, e); }
     }
 
     async function errorDrive(res, prefijo) {
