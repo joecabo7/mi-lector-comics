@@ -1374,20 +1374,56 @@
             const clampPan = () => {
                 const viewport = elements.canvasWrapper.getBoundingClientRect();
                 const content = elements.pagesContainer.getBoundingClientRect();
+                const layout = state.allPagesLayout;
                 let dx = 0, dy = 0;
-                if (content.width <= viewport.width) {
-                    dx = (viewport.left + viewport.width / 2) - (content.left + content.width / 2);
-                } else if (content.left > viewport.left) {
-                    dx = viewport.left - content.left;
-                } else if (content.right < viewport.right) {
-                    dx = viewport.right - content.right;
-                }
-                if (content.height <= viewport.height) {
-                    dy = (viewport.top + viewport.height / 2) - (content.top + content.height / 2);
-                } else if (content.top > viewport.top) {
-                    dy = viewport.top - content.top;
-                } else if (content.bottom < viewport.bottom) {
-                    dy = viewport.bottom - content.bottom;
+
+                // En vista continua solo se desplaza por el eje de lectura:
+                // columna = vertical; fila = horizontal. El otro eje se mantiene centrado.
+                if (layout === 'column') {
+                    if (content.width <= viewport.width) {
+                        dx = (viewport.left + viewport.width / 2) - (content.left + content.width / 2);
+                    } else if (content.left > viewport.left) {
+                        dx = viewport.left - content.left;
+                    } else if (content.right < viewport.right) {
+                        dx = viewport.right - content.right;
+                    }
+                    if (content.height <= viewport.height) {
+                        dy = (viewport.top + viewport.height / 2) - (content.top + content.height / 2);
+                    } else if (content.top > viewport.top) {
+                        dy = viewport.top - content.top;
+                    } else if (content.bottom < viewport.bottom) {
+                        dy = viewport.bottom - content.bottom;
+                    }
+                } else if (layout === 'row') {
+                    if (content.width <= viewport.width) {
+                        dx = (viewport.left + viewport.width / 2) - (content.left + content.width / 2);
+                    } else if (content.left > viewport.left) {
+                        dx = viewport.left - content.left;
+                    } else if (content.right < viewport.right) {
+                        dx = viewport.right - content.right;
+                    }
+                    if (content.height <= viewport.height) {
+                        dy = (viewport.top + viewport.height / 2) - (content.top + content.height / 2);
+                    } else if (content.top > viewport.top) {
+                        dy = viewport.top - content.top;
+                    } else if (content.bottom < viewport.bottom) {
+                        dy = viewport.bottom - content.bottom;
+                    }
+                } else {
+                    if (content.width <= viewport.width) {
+                        dx = (viewport.left + viewport.width / 2) - (content.left + content.width / 2);
+                    } else if (content.left > viewport.left) {
+                        dx = viewport.left - content.left;
+                    } else if (content.right < viewport.right) {
+                        dx = viewport.right - content.right;
+                    }
+                    if (content.height <= viewport.height) {
+                        dy = (viewport.top + viewport.height / 2) - (content.top + content.height / 2);
+                    } else if (content.top > viewport.top) {
+                        dy = viewport.top - content.top;
+                    } else if (content.bottom < viewport.bottom) {
+                        dy = viewport.bottom - content.bottom;
+                    }
                 }
                 state.panX += dx;
                 state.panY += dy;
@@ -1485,8 +1521,17 @@
                         const elapsed = Math.max(1, now - panLastTime);
                         const speed = Math.hypot(dx, dy) / elapsed;
                         const acceleration = Math.min(4.2, 1 + speed * 0.11);
-                        state.panX += dx * acceleration;
-                        state.panY += dy * acceleration;
+                        if (state.allPagesLayout === 'column') {
+                            // En columnas se recorre la tira vertical; evita que un gesto diagonal
+                            // saque el contenido lateralmente del visor.
+                            state.panY += dy * acceleration;
+                        } else if (state.allPagesLayout === 'row') {
+                            // En filas se recorre horizontalmente.
+                            state.panX += dx * acceleration;
+                        } else {
+                            state.panX += dx * acceleration;
+                            state.panY += dy * acceleration;
+                        }
                         applyTransform();
                         panLastTime = now;
                     }
@@ -1519,8 +1564,14 @@
 
             window.addEventListener('mousemove', (e) => {
                 if (state.isDragging) {
-                    state.panX = e.clientX - state.startX;
-                    state.panY = e.clientY - state.startY;
+                    if (state.allPagesLayout === 'column') {
+                        state.panY = e.clientY - state.startY;
+                    } else if (state.allPagesLayout === 'row') {
+                        state.panX = e.clientX - state.startX;
+                    } else {
+                        state.panX = e.clientX - state.startX;
+                        state.panY = e.clientY - state.startY;
+                    }
                     applyTransform();
                 }
             });
