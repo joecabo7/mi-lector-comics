@@ -54,7 +54,7 @@
     #comicvault-reader #pages-container { max-width:100%; max-height:100%; }
     #comicvault-reader #pages-container img { max-width:100%; max-height:calc(100dvh - 125px); object-fit:contain; }
     #comicvault-reader, #comicvault-reader * { -webkit-tap-highlight-color:transparent; }
-    #comicvault-reader #canvas-wrapper { touch-action:none; }
+    #comicvault-reader #canvas-wrapper { touch-action:none; overscroll-behavior:contain; }
     #comicvault-reader #pages-container { will-change:transform; }
     #comicvault-reader #sidebar { min-height:0; }
     #comicvault-reader #tab-content-thumbs, #comicvault-reader #tab-content-bookmarks { min-height:0; overscroll-behavior:contain; }
@@ -65,7 +65,7 @@
       #comicvault-reader #top-bar > div { min-width:0; }
       #comicvault-reader #top-bar button { padding:6px; }
       #comicvault-reader #top-bar #comic-title { max-width:27vw; }
-      #comicvault-reader #sidebar { top:48px; bottom:0; width:min(78vw,270px); height:auto; }
+      #comicvault-reader #sidebar { top:0; bottom:0; width:min(78vw,270px); height:auto; }
       #comicvault-reader #canvas-wrapper { overflow:hidden; }
       #comicvault-reader #pages-container img { max-width:100vw; max-height:calc(100svh - 100px); }
       #comicvault-reader .absolute.bottom-20.right-6 { right:5px; bottom:54px; }
@@ -95,7 +95,7 @@
       #comicvault-reader #top-bar button { padding:6px; }
       #comicvault-reader #top-bar .font-bold { font-size:13px; }
       #comicvault-reader #top-bar #btn-reader-logout span { display:none; }
-      #comicvault-reader #sidebar { position:absolute; z-index:40; top:48px; bottom:0; left:0; width:min(82vw,280px); height:auto; }
+      #comicvault-reader #sidebar { position:absolute; z-index:40; top:0; bottom:0; left:0; width:min(82vw,280px); height:auto; }
       #comicvault-reader #bottom-bar .h-12 { height:42px; padding-left:8px; padding-right:8px; }
       #comicvault-reader #bottom-bar { padding-bottom:env(safe-area-inset-bottom); }
       #comicvault-reader #canvas-wrapper { overflow:auto; }
@@ -116,14 +116,14 @@
     </div>
     <div class="flex items-center gap-1 sm:gap-2 shrink-0">
       <button class="btn" id="btn-conectar" type="button" style="margin:0;padding:8px 10px;font-size:12px;border-radius:8px"><i class="fa-brands fa-google"></i> <span class="hidden sm:inline">Conectar Drive</span><span class="sm:hidden">Conectar</span></button>
-      <button class="btn btn-peligro" id="btn-salir" type="button" style="display:none;margin:0;padding:8px 10px;font-size:12px;border-radius:8px">Salir</button>
+      <button class="btn btn-peligro" id="btn-salir" type="button" style="display:none;margin:0;padding:8px 10px;font-size:12px;border-radius:8px;background:#b91c1c;color:#fff;border:1px solid #ef4444">Salir</button>
     </div>
   </header>
   <div id="work-area" class="flex flex-1 min-h-0 overflow-hidden">
     <aside id="library-sidebar">
       <div class="flex border-b border-white/10 text-xs font-semibold">
-        <div class="flex-1 py-3 px-3 text-indigo-300 border-b-2 border-indigo-500"><i class="fa-solid fa-book-bookmark mr-2"></i>Mi biblioteca</div>
-        <div class="py-3 px-3 text-gray-500"><i class="fa-solid fa-cloud"></i></div>
+        <div class="flex-1 py-3 px-3 text-white bg-gray-900 border-b-2 border-blue-500"><i class="fa-solid fa-book-bookmark mr-2"></i>Mi biblioteca</div>
+        <div id="drive-cloud-badge" class="py-3 px-3 text-gray-400 bg-gray-900" title="Google Drive"><i class="fa-solid fa-cloud"></i></div>
       </div>
       <section id="biblioteca">
         <p class="ayuda text-gray-400">Conecta tu Google Drive y busca tus cómics CBZ.</p>
@@ -162,7 +162,7 @@
         <!-- TOP NAVIGATION BAR -->
         <header id="top-bar" class="glass-panel z-30 h-14 px-4 flex items-center justify-between shrink-0 transition-transform duration-300">
             <div class="flex items-center space-x-3">
-                <button id="reader-btn-sidebar-toggle" class="p-2 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors" title="Toggle Sidebar (T)">
+                <button id="reader-btn-sidebar-toggle" class="p-2 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors" title="Mostrar u ocultar menú (T)">
                     <i class="fa-solid fa-bars text-lg"></i>
                 </button>
                 <div class="flex items-center space-x-2">
@@ -572,8 +572,11 @@
       aplicarConfigVista();
     }
     const estado = (mensaje, error = false) => {
-      $('estado').textContent = mensaje;
-      $('estado').style.color = error ? '#ff6b6b' : '#00ff88';
+      const el = $('estado');
+      el.textContent = mensaje;
+      el.style.color = error ? '#ff6b6b' : '#9ca3af';
+      el.style.display = (!error && /Conectado con Google Drive/i.test(mensaje)) ? 'none' : 'block';
+      const nube = $('drive-cloud-badge'); if (nube) { if (!error && /Conectado con Google Drive/i.test(mensaje)) { nube.classList.add('bg-emerald-600','text-white'); nube.classList.remove('bg-gray-900','text-gray-400'); } else if (/Sesión cerrada|No conectado/i.test(mensaje)) { nube.classList.remove('bg-emerald-600','text-white'); nube.classList.add('bg-gray-900','text-gray-400'); } }
     };
 
     window.addEventListener('load', () => {
@@ -641,14 +644,14 @@
           $('btn-salir').style.display = 'inline-block';
           $('buscador-contenedor').style.display = 'flex';
           $('resultado-busqueda').style.display = 'block';
-          estado('Conectado con Google Drive.');
+          estado('Conectado con Google Drive.'); $('estado').style.display = 'none';
           $('resultado-busqueda').textContent = 'Escribe el nombre del cómic que quieres encontrar.';
           $('buscador').focus();
         },
         error_callback: (error) => {
           console.error('Ventana OAuth:', error);
           $('btn-conectar').style.display = 'inline-block';
-          $('btn-conectar').textContent = '🔐 Reanudar sesión de Google Drive';
+          $('btn-conectar').innerHTML = '<i class="fa-solid fa-arrow-rotate-right" style="color:#fff"></i> <span class="hidden sm:inline">Reanudar sesión</span><span class="sm:hidden">Reanudar</span>';
           estado('Google no pudo recuperar la sesión automáticamente. Pulsa «Reanudar sesión» para continuar.', true);
         }
       });
@@ -656,7 +659,7 @@
       // Si este navegador ya autorizó el lector, intenta recuperar el acceso sin volver a pedir consentimiento.
       // Google puede exigir un clic o una nueva autorización por seguridad; en ese caso queda disponible el botón.
       if (recordarSesionGoogle) {
-        $('btn-conectar').textContent = '🔐 Reanudar sesión de Google Drive';
+        $('btn-conectar').innerHTML = '<i class="fa-solid fa-arrow-rotate-right" style="color:#fff"></i> <span class="hidden sm:inline">Reanudar sesión</span><span class="sm:hidden">Reanudar</span>';
         estado('Intentando recuperar la sesión de Google Drive...');
         try { tokenClient.requestAccessToken({ prompt: '' }); }
         catch (error) {
@@ -771,6 +774,7 @@
 
       $('btn-conectar').style.display = 'none';
       $('btn-salir').style.display = 'none';
+      const nubeDrive = $('drive-cloud-badge'); if (nubeDrive) { nubeDrive.classList.remove('bg-emerald-600','text-white'); nubeDrive.classList.add('bg-gray-900','text-gray-400'); }
       $('estado').style.display = 'none';
       $('visor').style.display = 'block';
       if ($('reader-home')) $('reader-home').style.display = 'none';
@@ -876,7 +880,7 @@
       paginaActual = 0;
       nombreComicActual = '';
       if (accessToken) {
-        estado('Conectado con Google Drive.');
+        estado('Conectado con Google Drive.'); $('estado').style.display = 'none';
         $('resultado-busqueda').textContent = 'Busca otro cómic por nombre.';
         $('buscador').focus();
       }
@@ -894,7 +898,7 @@
       accessToken = null;
       recordarSesionGoogle = false;
       try { localStorage.removeItem(CLAVE_SESION_GOOGLE); } catch (_) {}
-      $('btn-conectar').textContent = '🔐 Conectar con Google Drive';
+      $('btn-conectar').innerHTML = '<i class="fa-brands fa-google" style="color:#fff"></i> <span class="hidden sm:inline">Conectar Drive</span><span class="sm:hidden">Conectar</span>';
       $('btn-conectar').style.display = 'inline-block';
       $('btn-salir').style.display = 'none';
       $('lista-comics').innerHTML = '';
@@ -1106,7 +1110,7 @@
         }
 
         /**
-         * Render Main Canvas View (Single / Double Page)
+         * Render Main Canvas View (Single / Doble página)
          */
         async function renderCurrentView() {
             if (state.pageFiles.length === 0) return;
@@ -1352,7 +1356,23 @@
                     applyTransform();
                 }
             }, {passive:false});
-            elements.canvasWrapper.addEventListener('touchend', e => { if(e.touches.length<2) pinchStartDistance=0; }, {passive:true});
+            // Arrastrar la página ampliada con un dedo en móviles.
+            let panTouchId = null, panTouchX = 0, panTouchY = 0;
+            elements.canvasWrapper.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1 && state.zoomLevel > 1) {
+                    const t = e.touches[0]; panTouchId = t.identifier; panTouchX = t.clientX; panTouchY = t.clientY;
+                } else if (e.touches.length > 1) panTouchId = null;
+            }, {passive:true});
+            elements.canvasWrapper.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 1 && panTouchId !== null && state.zoomLevel > 1) {
+                    const t = Array.from(e.touches).find(x => x.identifier === panTouchId);
+                    if (!t) return;
+                    e.preventDefault();
+                    state.panX += t.clientX - panTouchX; state.panY += t.clientY - panTouchY;
+                    panTouchX = t.clientX; panTouchY = t.clientY; applyTransform();
+                }
+            }, {passive:false});
+            elements.canvasWrapper.addEventListener('touchend', e => { if(e.touches.length<2) pinchStartDistance=0; if(e.touches.length===0) panTouchId=null; }, {passive:true});
             elements.pagesContainer.addEventListener('click', e => {
                 if (e.target.closest('img')) { elements.sidebar.classList.add('-translate-x-full'); state.sidebarOpen=false; }
             });
@@ -1431,7 +1451,7 @@
                 updateUIState();
             });
 
-            // Single / Double Page View Toggle
+            // Single / Doble página View Toggle
             elements.btnPageMode.addEventListener('click', () => {
                 state.isDoublePage = !state.isDoublePage;
                 elements.btnPageMode.classList.toggle('text-brand-400', state.isDoublePage);
@@ -1514,7 +1534,7 @@
                 item.className = 'flex items-center justify-between p-2 rounded-lg bg-white/5 hover:bg-brand-500/20 border border-white/5 cursor-pointer text-xs transition-colors';
                 item.innerHTML = `
                     <span class="font-medium text-gray-200">Page ${pageIdx + 1}</span>
-                    <button class="remove-bm p-1 text-gray-400 hover:text-red-400" title="Remove Bookmark">
+                    <button class="remove-bm p-1 text-gray-400 hover:text-red-400" title="Eliminar marcador">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 `;
