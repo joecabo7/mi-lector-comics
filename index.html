@@ -191,7 +191,7 @@
             <!-- Header Controls -->
             <div class="flex items-center space-x-1 sm:space-x-2">
                 <!-- Volver a mostrar la biblioteca y abrir archivos locales -->
-                <button id="btn-reader-library" type="button" class="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all" title="Mostrar u ocultar biblioteca">
+                <button id="btn-reader-library" type="button" class="flex items-center space-x-2 bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg shadow-brand-600/30" title="Mostrar u ocultar biblioteca">
                     <i class="fa-solid fa-book-bookmark"></i>
                     <span>Biblioteca</span>
                 </button>
@@ -649,6 +649,7 @@
           try { localStorage.setItem(CLAVE_SESION_GOOGLE, '1'); } catch (_) {}
           $('btn-conectar').style.display = 'none';
           $('btn-salir').style.display = 'inline-block';
+          $('btn-open-file').style.display = 'none';
           $('buscador-contenedor').style.display = 'flex';
           $('resultado-busqueda').style.display = 'block';
           estado('Conectado con Google Drive.'); $('estado').style.display = 'none';
@@ -915,6 +916,7 @@
       $('btn-conectar').innerHTML = '<i class="fa-brands fa-google" style="color:#fff"></i> <span class="hidden sm:inline">Conectar Drive</span><span class="sm:hidden">Conectar</span>';
       $('btn-conectar').style.display = 'inline-block';
       $('btn-salir').style.display = 'none';
+      $('btn-open-file').style.display = 'inline-flex';
       $('lista-comics').innerHTML = '';
       $('lista-comics').style.display = 'block';
       if (mostrarMensaje) estado('Sesión cerrada.');
@@ -1063,14 +1065,15 @@
                 elements.fileInput.click();
             });
             const btnReaderLibrary = document.getElementById('btn-reader-library');
-            if (btnReaderLibrary && elements.btnSidebarToggle) {
-                btnReaderLibrary.addEventListener('click', () => elements.btnSidebarToggle.click());
+            if (btnReaderLibrary) {
+                btnReaderLibrary.addEventListener('click', () => volverBiblioteca());
             }
 
             elements.fileInput.addEventListener('change', (e) => {
                 if (e.target.files.length > 0) {
                     handleFileSelect(e.target.files[0]);
                 }
+                e.target.value = '';
             });
         }
 
@@ -1084,6 +1087,11 @@
             }
 
             elements.comicTitle.textContent = file.name;
+            // Mostrar el lector independiente para archivos locales; antes solo se abría el selector.
+            elements.app.classList.remove('hidden');
+            elements.app.classList.add('flex');
+            document.getElementById('app-shell').style.display = 'none';
+            document.getElementById('comicvault-reader').style.display = 'block';
             showToast('Abriendo el archivo del cómic…');
 
             try {
