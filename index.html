@@ -6,8 +6,8 @@
     <title>Mi Visor de Cómics Personal</title>
     <link rel="icon" href="data:,">
     
-    <!-- LIBRERÍA CORREGIDA: Cambiada al servidor alternativo de Unpkg para evitar Cloudflare -->
-    <script src="https://unpkg.com"></script>
+    <!-- CARGA LOCAL: Ahora se descarga desde tu propio GitHub sin bloqueos de red -->
+    <script src="jszip.min.js"></script>
     
     <style>
         body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 20px; }
@@ -56,7 +56,6 @@
 
         const REDIRECT_URI = window.location.origin + window.location.pathname;
 
-        // Detectar el token que envía Google al regresar
         window.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.hash.substring(1));
             const token = params.get('access_token');
@@ -71,7 +70,6 @@
             }
         });
 
-        // Controles de teclado en PC
         document.addEventListener('keydown', (e) => {
             if (document.getElementById('visor').style.display === 'block') {
                 if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); cambiarPagina(1); }
@@ -80,7 +78,6 @@
             }
         });
 
-        // Enviar al usuario a la página oficial de login de Google
         function iniciarAutenticacion() {
             const urlAuth = 'https://google.com?' +
                            'client_id=' + CLIENT_ID +
@@ -91,7 +88,6 @@
             window.location.href = urlAuth;
         }
 
-        // Listar cómics desde Drive usando comandos web nativos
         async function listarArchivosDrive() {
             const estado = document.getElementById('estado');
             const lista = document.getElementById('lista-comics');
@@ -129,7 +125,6 @@
             }
         }
 
-        // Descargar el cómic y procesarlo con JSZip
         async function descargarYProcesarComic(fileId, fileName) {
             const estado = document.getElementById('estado');
             document.getElementById('lista-comics').style.display = 'none';
@@ -206,8 +201,11 @@
         function cerrarSesion() {
             accessToken = null;
             document.getElementById('btn-conectar').style.display = 'inline-block';
-document.getElementById('btn-salir').style.display = 'none';
-document.getElementById('lista-comics').innerHTML = "";
-document.getElementById('estado').innerText = "Sesión cerrada.";
-cerrarVisor();
-}
+            document.getElementById('btn-salir').style.display = 'none';
+            document.getElementById('lista-comics').innerHTML = "";
+            document.getElementById('estado').innerText = "Sesión cerrada.";
+            cerrarVisor();
+        }
+    </script>
+</body>
+</html>
