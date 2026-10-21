@@ -55,7 +55,9 @@
     #comicvault-reader #pages-container img { max-width:100%; max-height:calc(100dvh - 125px); object-fit:contain; }
     #comicvault-reader, #comicvault-reader * { -webkit-tap-highlight-color:transparent; }
     #comicvault-reader #canvas-wrapper { touch-action:none; overscroll-behavior:contain; }
-    #comicvault-reader #pages-container { will-change:transform; }
+    #comicvault-reader #pages-container { will-change:transform; transform-origin:top left; }
+    #comicvault-reader #pages-container img { display:block; }
+    #comicvault-reader #canvas-wrapper { overflow:auto; }
     #comicvault-reader #sidebar { min-height:0; }
     #comicvault-reader #tab-content-thumbs, #comicvault-reader #tab-content-bookmarks { min-height:0; overscroll-behavior:contain; }
     #comicvault-reader #settings-menu { max-width:calc(100vw - 16px); }
@@ -66,7 +68,7 @@
       #comicvault-reader #top-bar button { padding:6px; }
       #comicvault-reader #top-bar #comic-title { max-width:27vw; }
       #comicvault-reader #sidebar { top:0; bottom:0; width:min(78vw,270px); height:auto; }
-      #comicvault-reader #canvas-wrapper { overflow:hidden; }
+      #comicvault-reader #canvas-wrapper { overflow:hidden; touch-action:none; }
       #comicvault-reader #pages-container img { max-width:100vw; max-height:calc(100svh - 100px); }
       #comicvault-reader .absolute.bottom-20.right-6 { right:5px; bottom:54px; }
       #comicvault-reader .absolute.bottom-20.right-6 button { padding:6px; }
@@ -218,6 +220,11 @@
                             <button class="theme-opt bg-gray-900 border border-brand-500 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="default">Default</button>
                             <button class="theme-opt bg-slate-900 border border-slate-700 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="midnight">Midnight</button>
                             <button class="theme-opt bg-black border border-gray-800 h-8 rounded-md flex items-center justify-center text-xs font-medium" data-theme="oled">OLED</button>
+                        </div>
+                        <div class="font-semibold text-gray-400 uppercase tracking-wider mb-2 text-[10px]">Disposición de todas las páginas</div>
+                        <div class="flex rounded-lg bg-black/30 p-1 mb-3 gap-1">
+                            <button class="all-pages-opt flex-1 py-1 text-center rounded text-gray-400 hover:text-white transition-colors" data-layout="column">En columna</button>
+                            <button class="all-pages-opt flex-1 py-1 text-center rounded text-gray-400 hover:text-white transition-colors" data-layout="row">En fila</button>
                         </div>
                         <div class="font-semibold text-gray-400 uppercase tracking-wider mb-2 text-[10px]">Ajuste de página</div>
                         <div class="flex rounded-lg bg-black/30 p-1 mb-3">
@@ -946,6 +953,7 @@
             pageUrls: [],        // Blob URLs for rendered pages
             currentPage: 0,      // 0-indexed page index
             isDoublePage: false,
+            allPagesLayout: localStorage.getItem('comicvault-all-pages-layout') || 'none',
             readingDirection: 'LTR', // 'LTR' or 'RTL'
             fitMode: 'height',   // 'height', 'width', 'original'
             zoomLevel: 1,        // Scale multiplier
@@ -1132,11 +1140,18 @@
         async function renderCurrentView() {
             if (state.pageFiles.length === 0) return;
 
-            // Al cambiar de página se conserva el nivel de zoom y el desplazamiento actual.
+            // El zoom y el desplazamiento se aplican al contenedor completo: en modo continuo
+            // todas las páginas se comportan como una sola superficie.
             elements.pagesContainer.innerHTML = '';
-
-            const isDouble = state.isDoublePage && (state.currentPage < state.pageFiles.length - 1);
-            const pageIndices = isDouble ? [state.currentPage, state.currentPage + 1] : [state.currentPage];
+            const allPages = state.allPagesLayout === 'column' || state.allPagesLayout === 'row';
+            elements.pagesContainer.style.display = 'flex';
+            elements.pagesContainer.style.flexDirection = state.allPagesLayout === 'row' ? 'row' : 'column';
+            elements.pagesContainer.style.alignItems = 'center';
+            elements.pagesContainer.style.justifyContent = 'flex-start';
+            elements.pagesContainer.style.gap = allPages ? '8px' : '4px';
+            elements.pagesContainer.style.width = allPages ? 'max-content' : '';
+            const isDouble = !allPages && state.isDoublePage && (state.currentPage < state.pageFiles.length - 1);
+            const pageIndices = allPages ? Array.from({length: state.pageFiles.length}, (_, i) => i) : (isDouble ? [state.currentPage, state.currentPage + 1] : [state.currentPage]);
 
             if (state.readingDirection === 'RTL') {
                 pageIndices.reverse();
@@ -1151,7 +1166,13 @@
                 img.className = 'select-none rounded shadow-2xl object-contain transition-all duration-200';
                 
                 // Fit mode styling
-                if (state.fitMode === 'height') {
+                if (allPages) {
+                    img.style.flex = '0 0 auto';
+                    img.style.maxWidth = state.allPagesLayout === 'column' ? 'min(100vw, 900px)' : 'none';
+                    img.style.width = state.allPagesLayout === 'column' ? '100%' : 'auto';
+                    img.style.height = 'auto';
+                    img.style.maxHeight = 'none';
+                } else if (state.fitMode === 'height') {
                     img.style.maxHeight = 'calc(100vh - 7rem)';
                     img.style.width = 'auto';
                 } else if (state.fitMode === 'width') {
@@ -1360,6 +1381,7 @@
             // Gestos táctiles: pellizco para zoom, arrastre si está ampliada y deslizamiento para cambiar página.
             let pinchStartDistance = 0, pinchStartZoom = 1;
             let touchMode = null, panTouchId = null, panTouchX = 0, panTouchY = 0;
+            let panLastTime = 0;
             let swipeStartX = 0, swipeStartY = 0, swipeLastX = 0;
             elements.canvasWrapper.addEventListener('touchstart', (e) => {
                 if (e.touches.length === 2) {
@@ -1371,8 +1393,8 @@
                 } else if (e.touches.length === 1) {
                     const t = e.touches[0];
                     swipeStartX = swipeLastX = t.clientX; swipeStartY = t.clientY;
-                    panTouchId = t.identifier; panTouchX = t.clientX; panTouchY = t.clientY;
-                    touchMode = state.zoomLevel > 1 ? 'pan' : 'swipe';
+                    panTouchId = t.identifier; panTouchX = t.clientX; panTouchY = t.clientY; panLastTime = performance.now();
+                    touchMode = (state.zoomLevel > 1 || state.allPagesLayout !== 'none') ? 'pan' : 'swipe';
                 }
             }, {passive:false});
             elements.canvasWrapper.addEventListener('touchmove', (e) => {
@@ -1386,17 +1408,23 @@
                     const t = Array.from(e.touches).find(x => x.identifier === panTouchId);
                     if (!t) return;
                     const dx = t.clientX - panTouchX, dy = t.clientY - panTouchY;
-                    if (touchMode === 'pan' || state.zoomLevel > 1) {
+                    if (touchMode === 'pan' || state.zoomLevel > 1 || state.allPagesLayout !== 'none') {
                         e.preventDefault();
                         touchMode = 'pan';
-                        state.panX += dx; state.panY += dy; // Movimiento 1:1 con el dedo para evitar desplazamientos excesivos.
+                        const now = performance.now();
+                        const elapsed = Math.max(1, now - panLastTime);
+                        const speed = Math.hypot(dx, dy) / elapsed;
+                        const acceleration = Math.min(2.8, 1 + speed * 0.055);
+                        state.panX += dx * acceleration;
+                        state.panY += dy * acceleration;
                         applyTransform();
+                        panLastTime = now;
                     }
                     panTouchX = t.clientX; panTouchY = t.clientY; swipeLastX = t.clientX;
                 }
             }, {passive:false});
             elements.canvasWrapper.addEventListener('touchend', (e) => {
-                if (touchMode === 'swipe' && state.zoomLevel <= 1 && e.changedTouches.length) {
+                if (touchMode === 'swipe' && state.zoomLevel <= 1 && state.allPagesLayout === 'none' && e.changedTouches.length) {
                     const t = e.changedTouches[0];
                     const dx = t.clientX - swipeStartX, dy = t.clientY - swipeStartY;
                     if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.2) {
@@ -1530,6 +1558,28 @@
                     document.body.className = `bg-darkbg text-gray-100 font-sans h-full overflow-hidden select-none theme-${theme}`;
                     showToast('Tema actualizado');
                 });
+            });
+
+            // Disposición continua: todas las páginas comparten un único contenedor transformado.
+            document.querySelectorAll('.all-pages-opt').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const chosen = btn.dataset.layout;
+                    state.allPagesLayout = state.allPagesLayout === chosen ? 'none' : chosen;
+                    try { localStorage.setItem('comicvault-all-pages-layout', state.allPagesLayout); } catch (_) {}
+                    document.querySelectorAll('.all-pages-opt').forEach(b => {
+                        b.classList.toggle('bg-brand-600', state.allPagesLayout === b.dataset.layout);
+                        b.classList.toggle('text-white', state.allPagesLayout === b.dataset.layout);
+                    });
+                    if (state.allPagesLayout !== 'none') {
+                        state.isDoublePage = false;
+                    }
+                    renderCurrentView();
+                    showToast(state.allPagesLayout === 'none' ? 'Vista normal activada' : (state.allPagesLayout === 'row' ? 'Todas las páginas en fila' : 'Todas las páginas en columna'));
+                });
+            });
+            document.querySelectorAll('.all-pages-opt').forEach(b => {
+                b.classList.toggle('bg-brand-600', state.allPagesLayout === b.dataset.layout);
+                b.classList.toggle('text-white', state.allPagesLayout === b.dataset.layout);
             });
 
             // Fit Mode Options
