@@ -51,7 +51,7 @@
         let paginasComic = [];
         let paginaActual = 0;
 
-        // CORRECCIÓN DE URL: Limpia de forma segura los parámetros anteriores
+        // URL DE REDIRECCIÓN CORREGIDA (Sin errores de sintaxis)
         const REDIRECT_URI = window.location.origin + window.location.pathname;
 
         // Verificar si regresamos de la autenticación de Google con el Token en la URL
@@ -60,7 +60,6 @@
             const token = params.get('access_token');
             if (token) {
                 accessToken = token;
-                // Limpiar el token de la barra de direcciones por seguridad
                 window.history.replaceState({}, document.title, window.location.pathname);
                 
                 document.getElementById('btn-conectar').style.display = 'none';
@@ -205,7 +204,7 @@
         function cerrarSesion() {
             accessToken = null;
             document.getElementById('btn-conectar').style.display = 'inline-block';
-document.getElementById('btn-salir').style.display = 'none';
+            document.getElementById('btn-salir').style.display = 'none';
 document.getElementById('lista-comics').innerHTML = "";
 document.getElementById('estado').innerText = "Sesión cerrada.";
 cerrarVisor();
