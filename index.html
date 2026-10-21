@@ -674,6 +674,9 @@
         error_callback: (error) => {
           console.error('Ventana OAuth:', error);
           $('btn-conectar').style.display = 'inline-block';
+          $('btn-conectar').style.backgroundColor = '#2563eb';
+          $('btn-conectar').style.color = '#ffffff';
+          $('btn-conectar').style.borderColor = '#2563eb';
           $('btn-conectar').innerHTML = '<i class="fa-solid fa-arrow-rotate-right" style="color:#fff"></i> <span class="hidden sm:inline">Reanudar sesión</span><span class="sm:hidden">Reanudar</span>';
           estado('Google no pudo recuperar la sesión automáticamente. Pulsa «Reanudar sesión» para continuar.', true);
         }
@@ -682,6 +685,9 @@
       // Si este navegador ya autorizó el lector, intenta recuperar el acceso sin volver a pedir consentimiento.
       // Google puede exigir un clic o una nueva autorización por seguridad; en ese caso queda disponible el botón.
       if (recordarSesionGoogle) {
+        $('btn-conectar').style.backgroundColor = '#2563eb';
+        $('btn-conectar').style.color = '#ffffff';
+        $('btn-conectar').style.borderColor = '#2563eb';
         $('btn-conectar').innerHTML = '<i class="fa-solid fa-arrow-rotate-right" style="color:#fff"></i> <span class="hidden sm:inline">Reanudar sesión</span><span class="sm:hidden">Reanudar</span>';
         estado('Intentando recuperar la sesión de Google Drive...');
         try { tokenClient.requestAccessToken({ prompt: '' }); }
@@ -1169,10 +1175,20 @@
                 // Fit mode styling
                 if (allPages) {
                     img.style.flex = '0 0 auto';
-                    img.style.maxWidth = state.allPagesLayout === 'column' ? 'min(100vw, 900px)' : 'none';
-                    img.style.width = state.allPagesLayout === 'column' ? '100%' : 'auto';
-                    img.style.height = 'auto';
-                    img.style.maxHeight = 'none';
+                    if (state.allPagesLayout === 'column') {
+                        // En columnas, el tamaño mínimo corresponde al ancho disponible.
+                        const fitWidth = Math.min(elements.canvasWrapper.clientWidth || window.innerWidth, 900);
+                        img.style.width = fitWidth + 'px';
+                        img.style.maxWidth = fitWidth + 'px';
+                        img.style.height = 'auto';
+                        img.style.maxHeight = 'none';
+                    } else {
+                        // En filas, el tamaño mínimo corresponde a la altura visible de una página.
+                        img.style.width = 'auto';
+                        img.style.maxWidth = 'none';
+                        img.style.height = 'calc(100vh - 7rem)';
+                        img.style.maxHeight = 'calc(100vh - 7rem)';
+                    }
                 } else if (state.fitMode === 'height') {
                     img.style.maxHeight = 'calc(100vh - 7rem)';
                     img.style.width = 'auto';
@@ -1357,9 +1373,12 @@
                 elements.btnZoomReset.textContent = `${Math.round(state.zoomLevel * 100)}%`;
             };
 
+            const minZoom = () => state.allPagesLayout === 'none' ? 0.5 : 1;
             const setZoom = (newZoom) => {
-                state.zoomLevel = Math.max(0.5, Math.min(3.5, newZoom));
-                if (state.zoomLevel === 1) {
+                state.zoomLevel = Math.max(minZoom(), Math.min(3.5, newZoom));
+                // En vista continua no reiniciar el desplazamiento al llegar al tamaño mínimo:
+                // hacerlo llevaba la lectura al principio de la tira de páginas.
+                if (state.zoomLevel === 1 && state.allPagesLayout === 'none') {
                     state.panX = 0;
                     state.panY = 0;
                 }
@@ -1410,15 +1429,14 @@
                     const wrapRect = elements.canvasWrapper.getBoundingClientRect();
                     const currentFocusX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - wrapRect.left;
                     const currentFocusY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - wrapRect.top;
-                    const oldZoom = state.zoomLevel;
-                    const newZoom = Math.max(0.5, Math.min(3.5, pinchStartZoom*d/pinchStartDistance));
+                    const newZoom = Math.max(minZoom(), Math.min(3.5, pinchStartZoom*d/pinchStartDistance));
                     // Mantiene bajo los dedos el mismo punto de la página durante el pellizco.
                     const contentX = (pinchStartX - pinchStartPanX) / pinchStartZoom;
                     const contentY = (pinchStartY - pinchStartPanY) / pinchStartZoom;
                     state.zoomLevel = newZoom;
                     state.panX = currentFocusX - contentX * newZoom;
                     state.panY = currentFocusY - contentY * newZoom;
-                    if (state.zoomLevel <= 0.5) { state.panX=0; state.panY=0; }
+                    if (state.allPagesLayout === 'none' && state.zoomLevel <= 0.5) { state.panX=0; state.panY=0; }
                     applyTransform();
                 } else if (e.touches.length === 1 && panTouchId !== null) {
                     const t = Array.from(e.touches).find(x => x.identifier === panTouchId);
@@ -1597,6 +1615,7 @@
                     }
                     const chosen = btn.dataset.layout;
                     state.allPagesLayout = state.allPagesLayout === chosen ? 'none' : chosen;
+                    if (state.allPagesLayout !== 'none') state.zoomLevel = Math.max(1, state.zoomLevel);
                     try { localStorage.setItem('comicvault-all-pages-layout', state.allPagesLayout); } catch (_) {}
                     document.querySelectorAll('.all-pages-opt').forEach(b => {
                         b.classList.toggle('bg-brand-600', state.allPagesLayout === b.dataset.layout);
