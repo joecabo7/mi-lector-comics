@@ -1163,6 +1163,7 @@
 
                 const img = document.createElement('img');
                 img.src = url;
+                img.dataset.pageIndex = String(idx);
                 img.className = 'select-none rounded shadow-2xl object-contain transition-all duration-200';
                 
                 // Fit mode styling
@@ -1379,7 +1380,7 @@
             }, { passive: false });
 
             // Gestos táctiles: pellizco para zoom, arrastre si está ampliada y deslizamiento para cambiar página.
-            let pinchStartDistance = 0, pinchStartZoom = 1;
+            let pinchStartDistance = 0, pinchStartZoom = 1, pinchStartX = 0, pinchStartY = 0, pinchStartPanX = 0, pinchStartPanY = 0;
             let touchMode = null, panTouchId = null, panTouchX = 0, panTouchY = 0;
             let panLastTime = 0;
             let swipeStartX = 0, swipeStartY = 0, swipeLastX = 0;
@@ -1389,6 +1390,11 @@
                     touchMode = 'pinch';
                     pinchStartDistance = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
                     pinchStartZoom = state.zoomLevel;
+                    const wrapRect = elements.canvasWrapper.getBoundingClientRect();
+                    pinchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - wrapRect.left;
+                    pinchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - wrapRect.top;
+                    pinchStartPanX = state.panX;
+                    pinchStartPanY = state.panY;
                     panTouchId = null;
                 } else if (e.touches.length === 1) {
                     const t = e.touches[0];
@@ -1401,8 +1407,18 @@
                 if (touchMode === 'pinch' && e.touches.length === 2 && pinchStartDistance > 0) {
                     e.preventDefault();
                     const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
-                    state.zoomLevel = Math.max(0.5, Math.min(3.5, pinchStartZoom*d/pinchStartDistance));
-                    if (state.zoomLevel <= 1) { state.panX=0; state.panY=0; }
+                    const wrapRect = elements.canvasWrapper.getBoundingClientRect();
+                    const currentFocusX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - wrapRect.left;
+                    const currentFocusY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - wrapRect.top;
+                    const oldZoom = state.zoomLevel;
+                    const newZoom = Math.max(0.5, Math.min(3.5, pinchStartZoom*d/pinchStartDistance));
+                    // Mantiene bajo los dedos el mismo punto de la página durante el pellizco.
+                    const contentX = (pinchStartX - pinchStartPanX) / pinchStartZoom;
+                    const contentY = (pinchStartY - pinchStartPanY) / pinchStartZoom;
+                    state.zoomLevel = newZoom;
+                    state.panX = currentFocusX - contentX * newZoom;
+                    state.panY = currentFocusY - contentY * newZoom;
+                    if (state.zoomLevel <= 0.5) { state.panX=0; state.panY=0; }
                     applyTransform();
                 } else if (e.touches.length === 1 && panTouchId !== null) {
                     const t = Array.from(e.touches).find(x => x.identifier === panTouchId);
@@ -1414,7 +1430,7 @@
                         const now = performance.now();
                         const elapsed = Math.max(1, now - panLastTime);
                         const speed = Math.hypot(dx, dy) / elapsed;
-                        const acceleration = Math.min(2.8, 1 + speed * 0.055);
+                        const acceleration = Math.min(4.2, 1 + speed * 0.11);
                         state.panX += dx * acceleration;
                         state.panY += dy * acceleration;
                         applyTransform();
@@ -1562,7 +1578,23 @@
 
             // Disposición continua: todas las páginas comparten un único contenedor transformado.
             document.querySelectorAll('.all-pages-opt').forEach(btn => {
-                btn.addEventListener('click', () => {
+                btn.addEventListener('click', async () => {
+                    const viewport = elements.canvasWrapper.getBoundingClientRect();
+                    const focusX = viewport.left + viewport.width / 2;
+                    const focusY = viewport.top + viewport.height / 2;
+                    let anchor = null;
+                    const currentImages = Array.from(elements.pagesContainer.querySelectorAll('img[data-page-index]'));
+                    if (currentImages.length) {
+                        let img = currentImages.find(im => { const r = im.getBoundingClientRect(); return focusX >= r.left && focusX <= r.right && focusY >= r.top && focusY <= r.bottom; });
+                        if (!img) img = currentImages.reduce((best, im) => {
+                            const r = im.getBoundingClientRect(); const d = Math.hypot((r.left+r.right)/2-focusX, (r.top+r.bottom)/2-focusY);
+                            return !best || d < best.d ? {im, d} : best;
+                        }, null)?.im;
+                        if (img) {
+                            const r = img.getBoundingClientRect();
+                            anchor = { index: Number(img.dataset.pageIndex), rx: r.width ? Math.max(0, Math.min(1, (focusX-r.left)/r.width)) : .5, ry: r.height ? Math.max(0, Math.min(1, (focusY-r.top)/r.height)) : .5, x: focusX, y: focusY };
+                        }
+                    }
                     const chosen = btn.dataset.layout;
                     state.allPagesLayout = state.allPagesLayout === chosen ? 'none' : chosen;
                     try { localStorage.setItem('comicvault-all-pages-layout', state.allPagesLayout); } catch (_) {}
@@ -1573,7 +1605,19 @@
                     if (state.allPagesLayout !== 'none') {
                         state.isDoublePage = false;
                     }
-                    renderCurrentView();
+                    await renderCurrentView();
+                    if (anchor && state.allPagesLayout !== 'none') {
+                        requestAnimationFrame(() => {
+                            const img = elements.pagesContainer.querySelector(`img[data-page-index="${anchor.index}"]`);
+                            if (!img) return;
+                            const r = img.getBoundingClientRect();
+                            const px = r.left + r.width * anchor.rx;
+                            const py = r.top + r.height * anchor.ry;
+                            state.panX += anchor.x - px;
+                            state.panY += anchor.y - py;
+                            elements.pagesContainer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`;
+                        });
+                    }
                     showToast(state.allPagesLayout === 'none' ? 'Vista normal activada' : (state.allPagesLayout === 'row' ? 'Todas las páginas en fila' : 'Todas las páginas en columna'));
                 });
             });
