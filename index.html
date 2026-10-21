@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Visor de Cómics Personal</title>
+    <!-- Cargamos JSZip para descomprimir el CBZ en el navegador -->
+    <script src="https://cloudflare.com"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 20px; }
+        button { background: #007bff; color: white; border: none; padding: 12px 24px; font-size: 16px; cursor: pointer; border-radius: 5px; margin: 10px; }
+        button:hover { background: #0056b3; }
+        #lista-comics { list-style: none; padding: 0; max-width: 500px; margin: 20px auto; text-align: left; }
+        #lista-comics li { background: #1e1e1e; padding: 10px; margin: 5px 0; cursor: pointer; border-radius: 4px; transition: 0.2s; }
+        #lista-comics li:hover { background: #333; }
+        #visor { display: none; margin-top: 20px; }
+        #comic-img { max-width: 100%; max-height: 85vh; display: block; margin: 0 auto; }
+        .controles { margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <h1>📚 Mi Visor de Cómics</h1>
+    
+    <!-- Botones de Autenticación -->
+    <button id="btn-conectar" disabled style="background: #555; cursor: not-allowed;" onclick="handleAuthClick()">Cargando Google Drive...</button>
+
+    <button id="btn-salir" onclick="handleSignoutClick()" style="display: none;">Cerrar Sesión</button>
+
+    <!-- Lista de archivos encontrados -->
+    <ul id="lista-comics"></ul>
+
+    <!-- El Visor de imágenes -->
+    <div id="visor">
+        <button onclick="cambiarPagina(-1)">◀ Anterior</button>
+        <button onclick="cerrarVisor()">✖ Cerrar</button>
+        <button onclick="cambiarPagina(1)">Siguiente ▶</button>
+        <p>Página: <span id="num-pagina">0</span> / <span id="total-paginas">0</span></p>
+        <img id="comic-img" src="" alt="Cargando página...">
+    </div>
+
+    <!-- Scripts de Google API -->
+    <script async defer src="https://google.com" onload="gapiLoaded()"></script>
+    <script async defer src="https://google.com" onload="gisLoaded()"></script>
+
+    <script>
+        // CONFIGURACIÓN DE GOOGLE (Debes completar estos campos)
+        const CLIENT_ID = '159354537005-ctmmipo3d8b2gs25l1e9rkkruertveb0.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyCpEbJlI4mVv6ZtUDA2Xqx8k1403U28qiA';
+        
+        const SCOPES = 'https://googleapis.com';
+        const DISCOVERY_DOC = 'https://googleapis.com';
+
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
+        let paginasComic = [];
+        let paginaActual = 0;
+
+        function gapiLoaded() { gapi.load('client', intializeGapiClient); }
+        async function intializeGapiClient() {
+            await gapi.client.init({ apiKey: API_KEY, discoveryDocs: [DISCOVERY_DOC] });
+            gapiInited = true;
+            controlarBotones();
+        }
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: '' });
+            gisInited = true;
+            controlarBotones();
+        }
+        function controlarBotones() {
+            if (gapiInited && gisInited) document.getElementById('btn-conectar').style.display = 'inline-block';
+        }
+
+        function handleAuthClick() {
+            tokenClient.callback = async (resp) => {
+                if (resp.error !== undefined) throw (resp);
+                document.getElementById('btn-conectar').style.display = 'none';
+                document.getElementById('btn-salir').style.display = 'inline-block';
+                buscarComics();
+            };
+            if (gapi.client.getToken() === null) {
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            } else {
+                tokenClient.requestAccessToken({prompt: ''});
+            }
+        }
+
+        function handleSignoutClick() {
+            const token = gapi.client.getToken();
+            if (token !== null) {
+                google.accounts.oauth2.revoke(token.access_token);
+                gapi.client.setToken(null);
+                document.getElementById('lista-comics').innerHTML = '';
+                cerrarVisor();
+                document.getElementById('btn-conectar').style.display = 'inline-block';
+                document.getElementById('btn-salir').style.display = 'none';
+            }
+        }
+
+        // Buscar archivos .cbz en tu Drive
+        async function buscarComics() {
+            try {
+                const response = await gapi.client.drive.files.list({
+                    q: "name contains '.cbz' and trashed = false",
+                    fields: 'files(id, name)',
+                });
+                const files = response.result.files;
+                const lista = document.getElementById('lista-comics');
+                lista.innerHTML = '';
+                
+                if (!files || files.length === 0) {
+                    lista.innerHTML = '<li>No se encontraron archivos CBZ.</li>';
+                    return;
+                }
+
+                files.forEach(file => {
+                    const li = document.createElement('li');
+                    li.textContent = file.name;
+                    li.onclick = () => descargarYProcesarCBZ(file.id);
+                    lista.appendChild(li);
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Descargar el CBZ binario y descomprimirlo en memoria
+        async function descargarYProcesarCBZ(fileId) {
+            document.getElementById('lista-comics').style.display = 'none';
+            alert('Descargando y procesando cómic... por favor espera.');
+
+            try {
+                const response = await gapi.client.drive.files.get({ fileId: fileId, alt: 'media' });
+                // Convertir la respuesta de texto a un ArrayBuffer binario
+                const str = response.body;
+                const buf = new ArrayBuffer(str.length);
+                const bufView = new Uint8Array(buf);
+                for (let i = 0, strLen = str.length; i < strLen; i++) {
+                    bufView[i] = str.charCodeAt(i);
+                }
+
+                // JSZip lee el archivo comprimido
+                const zip = await JSZip.loadAsync(buf);
+                paginasComic = [];
+
+                // Filtrar solo archivos de imagen y ordenarlos alfabéticamente
+                const promesasArchivos = [];
+                zip.forEach((relativePath, zipEntry) => {
+                    if (!zipEntry.dir && /\.(jfif|jpeg|jpg|png|webp)$/i.test(zipEntry.name)) {
+                        promesasArchivos.push(
+                            zipEntry.async("blob").then(blob => {
+                                return { name: zipEntry.name, url: URL.createObjectURL(blob) };
+                            })
+                        );
+                    }
+                });
+
+                const imagenes = await Promise.all(promesasArchivos);
+                // Ordenar por nombre para que las páginas vayan en orden numérico
+                imagenes.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'}));
+                
+                paginasComic = imagenes.map(img => img.url);
+                
+                if(paginasComic.length > 0) {
+                    paginaActual = 0;
+                    mostrarPagina();
+                    document.getElementById('visor').style.display = 'block';
+                } else {
+                    alert('No se encontraron imágenes válidas dentro del CBZ.');
+                    cerrarVisor();
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert('Error cargando el archivo.');
+                cerrarVisor();
+            }
+        }
+
+        function mostrarPagina() {
+            document.getElementById('comic-img').src = paginasComic[paginaActual];
+            document.getElementById('num-pagina').textContent = paginaActual + 1;
+            document.getElementById('total-paginas').textContent = paginasComic.length;
+            window.scrollTo(0,0);
+        }
+
+        function cambiarPagina(direccion) {
+            paginaActual += direccion;
+            if (paginaActual < 0) paginaActual = 0;
+            if (paginaActual >= paginasComic.length) paginaActual = paginasComic.length - 1;
+            mostrarPagina();
+        }
+
+        function cerrarVisor() {
+            document.getElementById('visor').style.display = 'none';
+            document.getElementById('lista-comics').style.display = 'block';
+            // Limpiar URLs creadas para liberar memoria
+            paginasComic.forEach(url => URL.revokeObjectURL(url));
+            paginasComic = [];
+        }
+    </script>
+</body>
+</html>
