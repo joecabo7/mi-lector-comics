@@ -64,6 +64,30 @@
     #comicvault-reader #tab-content-thumbs, #comicvault-reader #tab-content-bookmarks { min-height:0; overscroll-behavior:contain; }
     #comicvault-reader #settings-menu { max-width:calc(100vw - 16px); }
     html, body { overscroll-behavior:none; }
+
+    /* Modo de lectura inmersivo: solo queda visible el cómic y un botón discreto para salir. */
+    #btn-exit-immersive { display:none; }
+    html:fullscreen #app-shell, html:fullscreen #comicvault-reader #top-bar,
+    html:fullscreen #comicvault-reader #bottom-bar, html:fullscreen #comicvault-reader #sidebar,
+    html:fullscreen #comicvault-reader .absolute.bottom-20.right-6,
+    html:fullscreen #comicvault-reader #btn-prev-overlay,
+    html:fullscreen #comicvault-reader #btn-next-overlay,
+    html:fullscreen #comicvault-reader #toast { display:none !important; }
+    html:fullscreen #comicvault-reader { height:100vh !important; width:100vw !important; background:#000; }
+    html:fullscreen #comicvault-reader #app { height:100vh !important; width:100vw !important; }
+    html:fullscreen #comicvault-reader #reader-viewport { height:100vh !important; min-height:100vh !important; }
+    html:fullscreen #comicvault-reader #canvas-wrapper { height:100vh !important; width:100vw !important; }
+    html:fullscreen #comicvault-reader #pages-container img { max-height:100vh !important; max-width:100vw !important; }
+    html:fullscreen #btn-exit-immersive {
+      display:flex; position:fixed; z-index:2147483647; top:12px; right:12px;
+      width:42px; height:42px; align-items:center; justify-content:center;
+      color:#fff; background:rgba(35,35,35,.28); border:1px solid rgba(255,255,255,.18);
+      border-radius:50%; opacity:.35; cursor:pointer; backdrop-filter:blur(4px);
+      -webkit-backdrop-filter:blur(4px); transition:opacity .2s, background .2s;
+    }
+    html:fullscreen #btn-exit-immersive:hover,
+    html:fullscreen #btn-exit-immersive:focus-visible { opacity:.95; background:rgba(35,35,35,.75); outline:none; }
+
     @media(max-width:700px) {
       #comicvault-reader #top-bar { height:48px; padding:0 6px; gap:2px; }
       #comicvault-reader #top-bar > div { min-width:0; }
@@ -113,6 +137,40 @@
       #app-shell.busqueda-activa #library-sidebar { flex-basis:100% !important; height:100% !important; }
       #app-shell.busqueda-activa #work-area { flex-direction:column; }
       #app-shell.busqueda-activa #lista-comics { min-height:0; flex:1 1 auto; }
+    }
+
+    /* Modo de lectura inmersivo: solo queda el control translúcido para salir. */
+    #btn-exit-fullscreen-float { display:none; }
+    :root:fullscreen #comicvault-reader #top-bar,
+    :root:fullscreen #comicvault-reader #sidebar,
+    :root:fullscreen #comicvault-reader #bottom-bar,
+    :root:fullscreen #comicvault-reader #btn-prev-overlay,
+    :root:fullscreen #comicvault-reader #btn-next-overlay,
+    :root:fullscreen #comicvault-reader .absolute.bottom-20.right-6,
+    :root:fullscreen #comicvault-reader #toast {
+      display:none !important;
+    }
+    :root:fullscreen #comicvault-reader,
+    :root:fullscreen #comicvault-reader #app,
+    :root:fullscreen #comicvault-reader #main-content,
+    :root:fullscreen #comicvault-reader main {
+      width:100vw !important; height:100vh !important; max-height:100vh !important;
+    }
+    :root:fullscreen #comicvault-reader #canvas-wrapper {
+      width:100vw !important; height:100vh !important; min-height:100vh !important;
+    }
+    :root:fullscreen #btn-exit-fullscreen-float {
+      display:flex !important; position:fixed; z-index:2147483647;
+      top:12px; right:12px; align-items:center; justify-content:center;
+      width:42px; height:42px; border:1px solid rgba(255,255,255,.28);
+      border-radius:50%; color:#fff; background:rgba(20,20,25,.28);
+      opacity:.38; backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
+      transition:opacity .2s, background .2s; cursor:pointer;
+    }
+    :root:fullscreen #btn-exit-fullscreen-float:hover,
+    :root:fullscreen #btn-exit-fullscreen-float:focus-visible { opacity:.95; background:rgba(20,20,25,.75); }
+    @media(max-width:700px) {
+      :root:fullscreen #btn-exit-fullscreen-float { top:8px; right:8px; width:38px; height:38px; }
     }
   </style>
 </head>
@@ -171,6 +229,7 @@
   </div>
 </div>
 <div id="comicvault-reader" class="h-full w-full" style="display:none">
+    <button id="btn-exit-fullscreen-float" type="button" aria-label="Salir de pantalla completa" title="Salir de pantalla completa"><i class="fa-solid fa-compress text-lg"></i></button>
     <!-- APP CONTAINER -->
     <div id="app" class="hidden h-full w-full flex-col relative">
 
@@ -1648,7 +1707,8 @@
                 renderCurrentView();
             });
 
-            // Pantalla completa
+            // Pantalla completa inmersiva
+            const btnExitFullscreenFloat = document.getElementById('btn-exit-fullscreen-float');
             elements.btnFullscreen.addEventListener('click', () => {
                 if (!document.fullscreenElement) {
                     document.documentElement.requestFullscreen().catch(err => console.error(err));
@@ -1656,6 +1716,11 @@
                     document.exitFullscreen();
                 }
             });
+            if (btnExitFullscreenFloat) {
+                btnExitFullscreenFloat.addEventListener('click', () => {
+                    if (document.fullscreenElement) document.exitFullscreen().catch(err => console.error(err));
+                });
+            }
 
             // Settings Menu Toggle
             elements.btnSettings.addEventListener('click', (e) => {
@@ -1815,5 +1880,22 @@
             if (typeof cerrarSesion === 'function') cerrarSesion();
         });
     </script>
+<button id="btn-exit-immersive" type="button" title="Salir de pantalla completa" aria-label="Salir de pantalla completa"><i class="fa-solid fa-compress"></i></button>
+<script>
+  (() => {
+    const exitBtn = document.getElementById('btn-exit-immersive');
+    const fullBtn = document.getElementById('btn-fullscreen');
+    if (exitBtn) exitBtn.addEventListener('click', async () => {
+      try { if (document.fullscreenElement) await document.exitFullscreen(); } catch (e) { console.error(e); }
+    });
+    document.addEventListener('fullscreenchange', () => {
+      const active = !!document.fullscreenElement;
+      if (exitBtn) exitBtn.title = active ? 'Salir de pantalla completa' : '';
+      if (fullBtn) {
+        fullBtn.innerHTML = active ? '<i class="fa-solid fa-compress text-lg"></i>' : '<i class="fa-solid fa-expand text-lg"></i>';
+      }
+    });
+  })();
+</script>
 </body>
 </html>
