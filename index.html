@@ -185,9 +185,9 @@
             <!-- Header Controls -->
             <div class="flex items-center space-x-1 sm:space-x-2">
                 <!-- Open File Button -->
-                <button id="btn-open-file" class="flex items-center space-x-2 bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg shadow-brand-600/30">
+                <button id="btn-open-file" type="button" class="flex items-center space-x-2 bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg shadow-brand-600/30" title="Abrir cómic desde este dispositivo">
                     <i class="fa-solid fa-folder-open"></i>
-                    <span class="hidden sm:inline">Biblioteca</span>
+                    <span>Abrir archivo</span>
                 </button>
                 <input type="file" id="file-input" accept=".cbz,.zip" class="hidden">
 
@@ -280,7 +280,7 @@
                     </div>
                     <h2 class="text-xl font-bold mb-2 text-gray-100">Suelta aquí tu cómic</h2>
                     <p class="text-sm text-gray-400 mb-6 max-w-sm">Supports standard <span class="text-brand-400 font-semibold">.CBZ</span> and <span class="text-brand-400 font-semibold">.ZIP</span> comic archives.</p>
-                    <button class="bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-600/30 flex items-center space-x-2">
+                    <button type="button" id="btn-select-local-comic" class="bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-600/30 flex items-center space-x-2">
                         <i class="fa-solid fa-plus"></i>
                         <span>Seleccionar archivo</span>
                     </button>
@@ -540,27 +540,11 @@
         if (!e.touches.length) gestoZoom = null;
       };
       cont.ondblclick = null;
-      // En PC, el cursor mueve la página en sentido contrario solo en «Ajustar ancho».
-      cont.onmouseenter = (e) => {
-        if (configVista.modo === 'una' && configVista.ajuste === 'ancho') ultimoMouse = { x: e.clientX, y: e.clientY };
-      };
-      cont.onmouseleave = () => {
-        ultimoMouse = null;
-        centrarImagenPorRaton();
-      };
-      cont.onmousemove = (e) => {
-        if (configVista.modo !== 'una' || configVista.ajuste !== 'ancho' || e.pointerType === 'touch') return;
-        if (!ultimoMouse) { ultimoMouse = { x: e.clientX, y: e.clientY }; return; }
-        const dx = e.clientX - ultimoMouse.x;
-        const dy = e.clientY - ultimoMouse.y;
-        ultimoMouse = { x: e.clientX, y: e.clientY };
-        const factor = sensibilidadMouse / 100;
-        const maxX = Math.max(40, cont.clientWidth * 0.45);
-        const maxY = Math.max(40, cont.clientHeight * 0.45);
-        desplazamientoX = Math.max(-maxX, Math.min(maxX, desplazamientoX - dx * factor));
-        desplazamientoY = Math.max(-maxY, Math.min(maxY, desplazamientoY - dy * factor));
-        aplicarZoom();
-      };
+      // No desplazar con hover: en PC el movimiento se controla con clic sostenido
+      // mediante los eventos mousedown/mousemove del lector principal.
+      cont.onmouseenter = null;
+      cont.onmouseleave = null;
+      cont.onmousemove = null;
     }
 
     function centrarImagenPorRaton() {
@@ -1050,16 +1034,29 @@
          */
         function setupFileHandlers() {
             // Drag and Drop
-            window.addEventListener('dragover', (e) => e.preventDefault());
+            window.addEventListener('dragover', (e) => {
+                // Solo habilitar soltar archivos reales, no arrastres de imágenes dentro del lector.
+                if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) e.preventDefault();
+            });
             window.addEventListener('drop', (e) => {
+                const hasFiles = e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+                if (!hasFiles) return;
                 e.preventDefault();
-                if (e.dataTransfer.files.length > 0) {
-                    handleFileSelect(e.dataTransfer.files[0]);
-                }
+                if (e.dataTransfer.files.length > 0) handleFileSelect(e.dataTransfer.files[0]);
             });
 
-            elements.dropzone.addEventListener('click', () => volverBiblioteca());
-            elements.btnOpenFile.addEventListener('click', () => volverBiblioteca());
+            // Abrir un archivo CBZ/ZIP guardado localmente en el PC o celular.
+            elements.dropzone.addEventListener('click', () => elements.fileInput.click());
+            const selectLocalComic = document.getElementById('btn-select-local-comic');
+            if (selectLocalComic) selectLocalComic.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                elements.fileInput.click();
+            });
+            elements.btnOpenFile.addEventListener('click', (e) => {
+                e.preventDefault();
+                elements.fileInput.click();
+            });
 
             elements.fileInput.addEventListener('change', (e) => {
                 if (e.target.files.length > 0) {
@@ -1104,6 +1101,14 @@
 
                 state.pageFiles = imageEntries.map(name => contents.files[name]);
                 state.zip = contents;
+                // En PC abrir ajustado a la altura disponible; en móvil conservar el ajuste al ancho.
+                if (window.matchMedia('(pointer: fine)').matches) {
+                    state.fitMode = 'height';
+                    document.querySelectorAll('.fit-opt').forEach(b => {
+                        b.classList.toggle('bg-brand-600', b.dataset.fit === 'height');
+                        b.classList.toggle('text-white', b.dataset.fit === 'height');
+                    });
+                }
 
                 // Hide dropzone
                 elements.dropzone.classList.add('hidden');
@@ -1532,25 +1537,29 @@
 
             // Drag / Pan capability
             elements.canvasWrapper.addEventListener('mousedown', (e) => {
-                if (state.zoomLevel > 1) {
-                    state.isDragging = true;
-                    state.startX = e.clientX - state.panX;
-                    state.startY = e.clientY - state.panY;
-                }
+                if (e.button !== 0 || state.zoomLevel <= 1 || e.target.closest('button')) return;
+                e.preventDefault();
+                state.isDragging = true;
+                state.startX = e.clientX - state.panX;
+                state.startY = e.clientY - state.panY;
+                elements.canvasWrapper.classList.add('active:cursor-grabbing');
             });
 
             window.addEventListener('mousemove', (e) => {
-                if (state.isDragging) {
-                    e.preventDefault();
-                    state.panX = e.clientX - state.startX;
-                    state.panY = e.clientY - state.startY;
-                    applyTransform();
+                if (!state.isDragging || !(e.buttons & 1)) {
+                    if (state.isDragging && !(e.buttons & 1)) state.isDragging = false;
+                    return;
                 }
+                e.preventDefault();
+                state.panX = e.clientX - state.startX;
+                state.panY = e.clientY - state.startY;
+                applyTransform();
             });
 
-            window.addEventListener('mouseup', () => {
-                state.isDragging = false;
-            });
+            const stopMouseDrag = () => { state.isDragging = false; };
+            window.addEventListener('mouseup', stopMouseDrag);
+            window.addEventListener('blur', stopMouseDrag);
+            elements.canvasWrapper.addEventListener('dragstart', e => e.preventDefault());
         }
 
         function resetZoomPan() {
