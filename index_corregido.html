@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#121212">
+  <title>Mi Visor de Cómics Personal</title>
+  <link rel="icon" href="data:,">
+
+  <!-- Ambas librerías se cargan desde el mismo repositorio de GitHub Pages. -->
+  <script src="./jszip.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 20px; }
+    h1 { font-size: clamp(1.45rem, 4vw, 2rem); }
+    .btn { background: #007bff; color: white; border: none; padding: 14px 22px; font-size: 16px; cursor: pointer; border-radius: 5px; margin: 8px 4px; display: inline-block; font-weight: bold; }
+    .btn:hover { background: #0056b3; }
+    .btn:disabled { opacity: .55; cursor: wait; }
+    #lista-comics { list-style: none; padding: 0; max-width: 700px; margin: 20px auto; text-align: left; }
+    #lista-comics li { background: #1e1e1e; padding: 12px; margin: 6px 0; cursor: pointer; border-radius: 5px; border: 1px solid #333; display: flex; gap: 12px; justify-content: space-between; align-items: center; overflow-wrap: anywhere; }
+    #lista-comics li:hover { background: #252525; border-color: #007bff; }
+    #visor { display: none; margin-top: 20px; }
+    #comic-img { max-width: 100%; max-height: 85vh; object-fit: contain; display: block; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.7); }
+    .controles { margin-bottom: 15px; }
+    #estado { color: #00ff88; margin: 15px auto; max-width: 900px; font-family: monospace; font-size: 14px; overflow-wrap: anywhere; }
+    .ayuda { color: #bbb; font-size: 13px; max-width: 700px; margin: 12px auto; line-height: 1.5; }
+    @media (max-width: 480px) {
+      body { padding: 12px; }
+      .btn { padding: 12px 14px; font-size: 15px; }
+      #lista-comics li { padding: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>📚 Mi Visor de Cómics</h1>
+  <p>Explora tus archivos CBZ de Google Drive desde el PC o el celular.</p>
+
+  <button class="btn" id="btn-conectar" type="button">🔐 Conectar con Google Drive</button>
+  <button class="btn" id="btn-salir" type="button" style="display:none;background:#dc3545;">✖ Cerrar sesión</button>
+
+  <div id="estado" role="status" aria-live="polite">Listo para conectar.</div>
+  <p class="ayuda">Se solicitará permiso de solo lectura para listar y abrir los archivos de tu Google Drive.</p>
+  <ul id="lista-comics"></ul>
+
+  <div id="visor">
+    <div class="controles">
+      <button class="btn" type="button" id="btn-anterior" style="background:#333;">◀ Anterior</button>
+      <button class="btn" type="button" id="btn-cerrar-comic" style="background:#dc3545;">✖ Cerrar cómic</button>
+      <button class="btn" type="button" id="btn-siguiente" style="background:#333;">Siguiente ▶</button>
+    </div>
+    <p style="font-size:18px;">Página: <b id="num-pagina">0</b> / <span id="total-paginas">0</span></p>
+    <img id="comic-img" src="" alt="Página del cómic">
+  </div>
+
+  <script>
+    // Este ID debe ser de un cliente OAuth de tipo "Aplicación web".
+    const CLIENT_ID = '159354537005-ctmmipo3d8b2gs25l1e9rkkruertveb0.apps.googleusercontent.com';
+    const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+    const DRIVE_API = 'https://www.googleapis.com/drive/v3';
+
+    let accessToken = null;
+    let tokenClient = null;
+    let paginasComic = [];
+    let paginaActual = 0;
+    let nombreComicActual = '';
+
+    const $ = (id) => document.getElementById(id);
+    const estado = (mensaje, error = false) => {
+      $('estado').textContent = mensaje;
+      $('estado').style.color = error ? '#ff6b6b' : '#00ff88';
+    };
+
+    window.addEventListener('load', () => {
+      $('btn-conectar').addEventListener('click', iniciarAutenticacion);
+      $('btn-salir').addEventListener('click', cerrarSesion);
+      $('btn-anterior').addEventListener('click', () => cambiarPagina(-1));
+      $('btn-siguiente').addEventListener('click', () => cambiarPagina(1));
+      $('btn-cerrar-comic').addEventListener('click', cerrarVisor);
+
+      // Google Identity Services reemplaza el antiguo flujo response_type=token.
+      if (!window.google || !google.accounts || !google.accounts.oauth2) {
+        estado('No se pudo cargar el servicio de inicio de sesión de Google. Comprueba tu conexión e inténtalo de nuevo.', true);
+        $('btn-conectar').disabled = true;
+        return;
+      }
+
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: async (response) => {
+          if (response.error) {
+            console.error('Error OAuth:', response);
+            estado('Google no autorizó el acceso: ' + response.error, true);
+            return;
+          }
+          if (!response.access_token) {
+            estado('Google no devolvió un token de acceso. Inténtalo de nuevo.', true);
+            return;
+          }
+          accessToken = response.access_token;
+          $('btn-conectar').style.display = 'none';
+          $('btn-salir').style.display = 'inline-block';
+          estado('Conectado. Buscando archivos CBZ...');
+          await listarArchivosDrive();
+        },
+        error_callback: (error) => {
+          console.error('Ventana OAuth:', error);
+          estado('No se pudo completar el inicio de sesión de Google. Revisa las ventanas emergentes y la configuración OAuth.', true);
+        }
+      });
+    });
+
+    function iniciarAutenticacion() {
+      if (!tokenClient) {
+        estado('El servicio de Google aún no está listo. Recarga la página e inténtalo de nuevo.', true);
+        return;
+      }
+      // El token se solicita tras la acción directa del usuario.
+      tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
+    }
+
+    async function listarArchivosDrive() {
+      const lista = $('lista-comics');
+      lista.innerHTML = '';
+      lista.style.display = 'block';
+      estado('Buscando archivos .cbz en Google Drive...');
+
+      try {
+        const encontrados = [];
+        let pageToken = null;
+
+        // Sigue la paginación para no limitar la biblioteca a la primera página.
+        do {
+          const params = new URLSearchParams({
+            q: "trashed = false and (name contains '.cbz' or name contains '.CBZ')",
+            fields: 'nextPageToken,files(id,name,size,mimeType)',
+            pageSize: '100',
+            orderBy: 'name'
+          });
+          if (pageToken) params.set('pageToken', pageToken);
+
+          const res = await fetch(`${DRIVE_API}/files?${params.toString()}`, {
+            headers: { Authorization: 'Bearer ' + accessToken }
+          });
+          if (!res.ok) throw await errorDrive(res, 'No se pudo consultar Google Drive');
+          const data = await res.json();
+          if (data.files) encontrados.push(...data.files);
+          pageToken = data.nextPageToken || null;
+        } while (pageToken);
+
+        if (encontrados.length === 0) {
+          estado('Conexión correcta, pero no se encontraron archivos .cbz en tu Drive.');
+          return;
+        }
+
+        estado(`Se encontraron ${encontrados.length} cómic(s).`);
+        encontrados.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+        for (const file of encontrados) {
+          const li = document.createElement('li');
+          const nombre = document.createElement('span');
+          nombre.textContent = '📖 ' + file.name;
+          const abrir = document.createElement('b');
+          abrir.textContent = 'Abrir';
+          abrir.style.color = '#4da3ff';
+          li.append(nombre, abrir);
+          li.addEventListener('click', () => descargarYProcesarComic(file.id, file.name));
+          lista.appendChild(li);
+        }
+      } catch (err) {
+        console.error('Error al listar Drive:', err);
+        estado(err.message || 'Error al conectar con Google Drive.', true);
+        if (err.status === 401) cerrarSesion(false);
+      }
+    }
+
+    async function errorDrive(res, prefijo) {
+      let detalle = '';
+      try {
+        const data = await res.json();
+        detalle = data.error?.message || '';
+      } catch (_) {}
+      const err = new Error(`${prefijo} (HTTP ${res.status})${detalle ? ': ' + detalle : ''}`);
+      err.status = res.status;
+      return err;
+    }
+
+    async function descargarYProcesarComic(fileId, fileName) {
+      if (!window.JSZip) {
+        estado('No se ha cargado jszip.min.js. Comprueba que esté junto a index.html en GitHub Pages.', true);
+        return;
+      }
+
+      $('lista-comics').style.display = 'none';
+      $('visor').style.display = 'none';
+      estado(`Descargando "${fileName}"...`);
+
+      try {
+        const res = await fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`, {
+          headers: { Authorization: 'Bearer ' + accessToken }
+        });
+        if (!res.ok) throw await errorDrive(res, 'No se pudo descargar el cómic');
+        const blob = await res.blob();
+
+        estado('Descomprimiendo páginas...');
+        const zip = await JSZip.loadAsync(blob);
+        const archivosImagen = [];
+
+        zip.forEach((relativePath, entry) => {
+          if (!entry.dir && /\.(jpe?g|jfif|png|webp|gif|avif)$/i.test(entry.name)) {
+            archivosImagen.push(entry);
+          }
+        });
+
+        archivosImagen.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+        if (archivosImagen.length === 0) {
+          estado('El archivo no contiene imágenes compatibles.', true);
+          $('lista-comics').style.display = 'block';
+          return;
+        }
+
+        // Convierte las páginas en orden para mantener el consumo de memoria controlado.
+        limpiarPaginas();
+        paginasComic = [];
+        for (let i = 0; i < archivosImagen.length; i++) {
+          estado(`Procesando páginas: ${i + 1} de ${archivosImagen.length}...`);
+          const imageBlob = await archivosImagen[i].async('blob');
+          paginasComic.push(URL.createObjectURL(imageBlob));
+        }
+
+        nombreComicActual = fileName;
+        paginaActual = 0;
+        $('visor').style.display = 'block';
+        mostrarPagina();
+        estado(`Leyendo: ${fileName}`);
+      } catch (err) {
+        console.error('Error al abrir el cómic:', err);
+        estado(err.message || 'No se pudo abrir el cómic.', true);
+        $('lista-comics').style.display = 'block';
+      }
+    }
+
+    function mostrarPagina() {
+      if (!paginasComic.length) return;
+      $('comic-img').src = paginasComic[paginaActual];
+      $('num-pagina').textContent = String(paginaActual + 1);
+      $('total-paginas').textContent = String(paginasComic.length);
+      $('btn-anterior').disabled = paginaActual === 0;
+      $('btn-siguiente').disabled = paginaActual === paginasComic.length - 1;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cambiarPagina(direccion) {
+      if (!paginasComic.length) return;
+      const nueva = paginaActual + direccion;
+      if (nueva < 0 || nueva >= paginasComic.length) return;
+      paginaActual = nueva;
+      mostrarPagina();
+    }
+
+    function limpiarPaginas() {
+      paginasComic.forEach(url => URL.revokeObjectURL(url));
+      paginasComic = [];
+      $('comic-img').removeAttribute('src');
+    }
+
+    function cerrarVisor() {
+      $('visor').style.display = 'none';
+      $('lista-comics').style.display = 'block';
+      limpiarPaginas();
+      paginaActual = 0;
+      nombreComicActual = '';
+      if (accessToken) estado('Conectado con Google Drive. Selecciona otro cómic.');
+    }
+
+    function cerrarSesion(mostrarMensaje = true) {
+      cerrarVisor();
+      if (accessToken && window.google?.accounts?.oauth2) {
+        google.accounts.oauth2.revoke(accessToken, () => {});
+      }
+      accessToken = null;
+      $('btn-conectar').style.display = 'inline-block';
+      $('btn-salir').style.display = 'none';
+      $('lista-comics').innerHTML = '';
+      $('lista-comics').style.display = 'block';
+      if (mostrarMensaje) estado('Sesión cerrada.');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if ($('visor').style.display !== 'block') return;
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        cambiarPagina(1);
+      }
+      if (e.key === 'ArrowLeft') cambiarPagina(-1);
+      if (e.key === 'Escape') cerrarVisor();
+    });
+
+    // Gestos táctiles para pasar página en celulares.
+    let touchStartX = null;
+    $('comic-img').addEventListener('touchstart', e => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+    $('comic-img').addEventListener('touchend', e => {
+      if (touchStartX === null) return;
+      const delta = e.changedTouches[0].screenX - touchStartX;
+      if (Math.abs(delta) > 45) cambiarPagina(delta < 0 ? 1 : -1);
+      touchStartX = null;
+    }, { passive: true });
+  </script>
+</body>
+</html>
