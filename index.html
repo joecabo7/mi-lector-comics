@@ -130,8 +130,7 @@
       #app-shell.busqueda-activa #lista-comics { min-height:0; flex:1 1 auto; }
     }
 
-    /* Modo de lectura inmersivo: solo queda el control translúcido para salir. */
-    #btn-exit-fullscreen-float { display:none; }
+    /* Modo de lectura inmersivo: se ocultan todos los controles. */
     :root:fullscreen #comicvault-reader #top-bar,
     :root:fullscreen #comicvault-reader #sidebar,
     :root:fullscreen #comicvault-reader #bottom-bar,
@@ -149,19 +148,6 @@
     }
     :root:fullscreen #comicvault-reader #canvas-wrapper {
       width:100vw !important; height:100vh !important; min-height:100vh !important;
-    }
-    :root:fullscreen #btn-exit-fullscreen-float {
-      display:flex !important; position:fixed; z-index:2147483647;
-      top:12px; right:12px; align-items:center; justify-content:center;
-      width:42px; height:42px; border:1px solid rgba(255,255,255,.28);
-      border-radius:50%; color:#fff; background:rgba(20,20,25,.28);
-      opacity:.38; backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
-      transition:opacity .2s, background .2s; cursor:pointer;
-    }
-    :root:fullscreen #btn-exit-fullscreen-float:hover,
-    :root:fullscreen #btn-exit-fullscreen-float:focus-visible { opacity:.95; background:rgba(20,20,25,.75); }
-    @media(max-width:700px) {
-      :root:fullscreen #btn-exit-fullscreen-float { top:8px; right:8px; width:38px; height:38px; }
     }
   </style>
 </head>
@@ -220,7 +206,6 @@
   </div>
 </div>
 <div id="comicvault-reader" class="h-full w-full" style="display:none">
-    <button id="btn-exit-fullscreen-float" type="button" aria-label="Salir de pantalla completa" title="Salir de pantalla completa"><i class="fa-solid fa-compress text-lg"></i></button>
     <!-- APP CONTAINER -->
     <div id="app" class="hidden h-full w-full flex-col relative">
 
@@ -1699,7 +1684,6 @@
             });
 
             // Pantalla completa inmersiva
-            const btnExitFullscreenFloat = document.getElementById('btn-exit-fullscreen-float');
             elements.btnFullscreen.addEventListener('click', () => {
                 if (!document.fullscreenElement) {
                     document.documentElement.requestFullscreen().catch(err => console.error(err));
@@ -1707,12 +1691,6 @@
                     document.exitFullscreen();
                 }
             });
-            if (btnExitFullscreenFloat) {
-                btnExitFullscreenFloat.addEventListener('click', () => {
-                    if (document.fullscreenElement) document.exitFullscreen().catch(err => console.error(err));
-                });
-            }
-
             // Settings Menu Toggle
             elements.btnSettings.addEventListener('click', (e) => {
                 e.stopPropagation();
